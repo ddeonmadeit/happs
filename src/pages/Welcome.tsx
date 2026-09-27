@@ -1,7 +1,5 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { Share } from "lucide-react";
-import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { Button } from "@/components/ui/Button";
 import { HappsMark, Wordmark } from "@/components/Logo";
 import { spring } from "@/components/motion";
@@ -9,7 +7,6 @@ import { spring } from "@/components/motion";
 /** First screen for signed-out visitors. Signed-in users go straight to the map. */
 export default function Welcome() {
   const navigate = useNavigate();
-  const { isInstalled, isIOS } = useInstallPrompt();
 
   return (
     <motion.main
@@ -18,9 +15,10 @@ export default function Welcome() {
       exit={{ opacity: 0, transition: { duration: 0.2 } }}
       className="absolute inset-0 z-40 flex flex-col items-center overflow-hidden bg-background px-6 pb-safe pt-safe"
     >
+      {/* A faint warm glow behind the logo; the page stays charcoal. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute left-1/2 top-[36%] h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/[0.13] blur-3xl"
+        className="pointer-events-none absolute left-1/2 top-[38%] h-[340px] w-[340px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/[0.05] blur-3xl"
       />
 
       <div className="relative flex flex-1 flex-col items-center justify-center">
@@ -32,9 +30,8 @@ export default function Welcome() {
           <motion.div
             animate={{ y: [0, -8, 0] }}
             transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-            className="flex h-28 w-28 items-center justify-center rounded-[34px] bg-accent text-accent-foreground shadow-[0_20px_50px_-12px_hsl(var(--accent)/0.65)]"
           >
-            <HappsMark className="h-14 w-14" />
+            <HappsMark className="h-24 w-24 text-accent drop-shadow-[0_10px_24px_hsl(var(--accent)/0.22)]" />
           </motion.div>
         </motion.div>
 
@@ -50,9 +47,9 @@ export default function Welcome() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...spring.gentle, delay: 0.42 }}
-          className="mt-3 max-w-[18rem] text-center text-[17px] font-medium leading-snug text-muted-foreground"
+          className="mt-1 whitespace-nowrap text-center text-[clamp(1rem,4.6vw,1.2rem)] font-semibold text-cream"
         >
-          See what’s happening around you, right now.
+          What’s happening in Sydney?
         </motion.p>
       </div>
 
@@ -68,15 +65,6 @@ export default function Welcome() {
         <Button variant="secondary" size="lg" className="w-full" onClick={() => navigate("/auth")}>
           I have an account
         </Button>
-        {isIOS && !isInstalled && (
-          <button
-            type="button"
-            onClick={() => navigate("/install")}
-            className="flex w-full items-center justify-center gap-1.5 pt-2 text-sm font-medium text-muted-foreground"
-          >
-            <Share className="h-4 w-4" /> Add to Home Screen for the full app
-          </button>
-        )}
       </motion.div>
     </motion.main>
   );

@@ -11,24 +11,25 @@
 }
 
 @layer base {
-  /* One theme: charcoal surfaces, orange highlights. */
+  /* One theme: warm dark charcoal surfaces, orange highlights, cream accents. */
   :root {
-    --background: 240 5% 11.5%; /* #1c1c1f */
-    --foreground: 240 5% 96%;
-    --card: 240 5% 15.5%; /* #26262a */
-    --card-foreground: 240 5% 96%;
-    --muted: 240 5% 19.5%; /* #303035 */
-    --muted-foreground: 240 4% 62%;
+    --background: 30 10% 10.5%; /* #1d1b18 */
+    --foreground: 38 30% 94%;
+    --card: 30 8% 14.5%; /* #282522 */
+    --card-foreground: 38 30% 94%;
+    --muted: 30 7% 18.5%; /* #322f2c */
+    --muted-foreground: 32 8% 62%;
     --primary: 25 100% 55%; /* #ff7a1a */
-    --primary-foreground: 240 5% 10%;
+    --primary-foreground: 30 10% 9%;
     --accent: 25 100% 55%;
-    --accent-foreground: 240 5% 10%;
-    --secondary: 240 5% 19.5%;
-    --secondary-foreground: 240 5% 96%;
+    --accent-foreground: 30 10% 9%;
+    --secondary: 30 7% 18.5%;
+    --secondary-foreground: 38 30% 94%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 5% 21%;
-    --input: 240 5% 19.5%;
+    --border: 30 7% 21%;
+    --input: 30 7% 18.5%;
+    --cream: 40 52% 86%; /* #eee1c9 */
     --ring: 25 100% 55%;
     --radius: 1.25rem;
     --marker-active: 25 100% 55%;
@@ -131,7 +132,7 @@
   /* Floating controls over the map: a lifted charcoal with a hairline edge
      so they stay visible on dark tiles. */
   .glass {
-    @apply border border-white/[0.08] bg-[#2b2b30]/95 shadow-[0_10px_30px_rgb(0_0_0/0.5)] backdrop-blur-xl;
+    @apply border border-white/[0.08] bg-[#2d2a27]/95 shadow-[0_10px_30px_rgb(0_0_0/0.5)] backdrop-blur-xl;
   }
   .no-scrollbar {
     scrollbar-width: none;

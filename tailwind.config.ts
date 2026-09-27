@@ -48,6 +48,7 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        cream: "hsl(var(--cream))",
         live: "hsl(var(--marker-active))",
         dead: "hsl(var(--marker-inactive))",
       },
