@@ -31,7 +31,7 @@ export default function Welcome() {
             animate={{ y: [0, -8, 0] }}
             transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 1 }}
           >
-            <HappsMark className="h-24 w-24 text-accent drop-shadow-[0_10px_24px_hsl(var(--accent)/0.22)]" />
+            <HappsMark glitch className="h-24 w-24 drop-shadow-[0_10px_24px_hsl(var(--accent)/0.22)]" />
           </motion.div>
         </motion.div>
 
@@ -39,7 +39,7 @@ export default function Welcome() {
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...spring.gentle, delay: 0.3 }}
-          className="mt-10 text-center text-[clamp(3.8rem,18vw,5.5rem)] text-accent"
+          className="mt-10 text-center text-[clamp(3.8rem,18vw,5.5rem)]"
         >
           <Wordmark />
         </motion.h1>

@@ -8,7 +8,7 @@ type Variant = "accent" | "secondary" | "ghost" | "destructive";
 type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
-  accent: "bg-accent text-accent-foreground shadow-[0_6px_20px_-6px_hsl(var(--accent)/0.6)]",
+  accent: "glitch-bg text-accent-foreground shadow-[0_6px_20px_-6px_hsl(var(--accent)/0.55)]",
   secondary: "bg-muted text-foreground",
   ghost: "bg-transparent text-foreground",
   destructive: "bg-destructive text-destructive-foreground shadow-[0_6px_20px_-6px_hsl(var(--destructive)/0.55)]",
@@ -74,7 +74,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
         size === "lg" && "h-14 w-14",
         variant === "glass" && "glass",
         variant === "muted" && "bg-muted",
-        variant === "accent" && "bg-accent text-accent-foreground shadow-[0_6px_20px_-6px_hsl(var(--accent)/0.6)]",
+        variant === "accent" && "glitch-bg text-accent-foreground shadow-[0_6px_20px_-6px_hsl(var(--accent)/0.55)]",
         className,
       )}
       {...props}

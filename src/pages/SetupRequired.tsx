@@ -5,8 +5,8 @@ export default function SetupRequired() {
   return (
     <div className="scroll-area absolute inset-0 flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-md space-y-6 text-center">
-        <HappsMark className="mx-auto h-14 w-14 text-accent" />
-        <Wordmark className="block text-5xl text-accent" />
+        <HappsMark glitch className="mx-auto h-14 w-14" />
+        <Wordmark className="text-5xl" />
         <div className="space-y-3 rounded-4xl bg-card p-6 text-left">
           <h1 className="text-lg font-semibold">Connect a Supabase project</h1>
           <p className="text-sm text-muted-foreground">

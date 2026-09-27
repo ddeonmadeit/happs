@@ -213,7 +213,7 @@ export default function Auth() {
                 key={s}
                 animate={{ width: i <= progress ? 28 : 10 }}
                 transition={spring.bouncy}
-                className={cn("h-2 rounded-full", i <= progress ? "bg-accent" : "bg-muted")}
+                className={cn("h-2 rounded-full", i <= progress ? "glitch-bg" : "bg-muted")}
               />
             ))}
           </div>
@@ -222,7 +222,9 @@ export default function Auth() {
       </header>
 
       <main className="scroll-area mx-auto flex w-full max-w-sm flex-1 flex-col px-6 pb-safe pt-4">
-        <Wordmark className="mb-8 block text-center text-5xl text-accent" />
+        <div className="mb-8 text-center">
+          <Wordmark className="text-5xl" />
+        </div>
 
         <AnimatePresence mode="wait" initial={false}>
           <motion.div

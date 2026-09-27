@@ -19,9 +19,9 @@
     --card-foreground: 38 30% 94%;
     --muted: 30 7% 18.5%; /* #322f2c */
     --muted-foreground: 32 8% 62%;
-    --primary: 25 100% 55%; /* #ff7a1a */
+    --primary: 16 81% 49%; /* #e44d18 — sampled from the glitch artwork */
     --primary-foreground: 30 10% 9%;
-    --accent: 25 100% 55%;
+    --accent: 16 81% 49%;
     --accent-foreground: 30 10% 9%;
     --secondary: 30 7% 18.5%;
     --secondary-foreground: 38 30% 94%;
@@ -30,9 +30,9 @@
     --border: 30 7% 21%;
     --input: 30 7% 18.5%;
     --cream: 40 52% 86%; /* #eee1c9 */
-    --ring: 25 100% 55%;
+    --ring: 16 81% 49%;
     --radius: 1.25rem;
-    --marker-active: 25 100% 55%;
+    --marker-active: 16 81% 49%;
     --marker-inactive: 0 72% 58%;
     color-scheme: dark;
   }
@@ -133,6 +133,26 @@
      so they stay visible on dark tiles. */
   .glass {
     @apply border border-white/[0.08] bg-[#2d2a27]/95 shadow-[0_10px_30px_rgb(0_0_0/0.5)] backdrop-blur-xl;
+  }
+  /*
+   * The brand texture: orange streaks through a cream-gold core with dark
+   * glitch edges and film grain (public/textures/glitch.webp, cut from the
+   * reference artwork). Solid orange shows while it loads.
+   */
+  .glitch-bg {
+    background-color: hsl(var(--accent));
+    background-image: url("/textures/glitch.webp");
+    background-size: cover;
+    background-position: 40% 50%;
+  }
+  .glitch-text {
+    background-color: hsl(var(--accent));
+    background-image: url("/textures/glitch.webp");
+    background-size: 100% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
   }
   .no-scrollbar {
     scrollbar-width: none;

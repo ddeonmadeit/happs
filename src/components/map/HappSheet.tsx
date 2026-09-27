@@ -112,7 +112,7 @@ export function HappSheet({ happId, onClose, onLoaded }: Props) {
                       onClick={() => navigate(`/happ/${happ.id}/story/${p.user_id}`)}
                       className="flex w-[68px] flex-col items-center gap-1.5"
                     >
-                      <span className="rounded-full bg-gradient-to-tr from-accent to-amber-300 p-[3px]">
+                      <span className="glitch-bg rounded-full p-[3px]">
                         <Avatar
                           src={p.profile?.avatar_url}
                           name={p.profile?.display_name || p.profile?.username}

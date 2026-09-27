@@ -42,7 +42,7 @@ export default defineConfig({
       registerType: "autoUpdate",
       injectRegister: "auto",
       injectManifest: {
-        globPatterns: ["**/*.{js,css,html,svg,png,ico,ttf,woff2}"],
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,ttf,woff2,webp}"],
         globIgnores: ["splash/**", "404.html"],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },

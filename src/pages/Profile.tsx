@@ -180,7 +180,7 @@ export default function Profile() {
                     aria-label="Change profile photo"
                     whileTap={{ scale: 0.8 }}
                     transition={spring.bouncy}
-                    className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md ring-[3px] ring-background"
+                    className="glitch-bg absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full text-accent-foreground shadow-md ring-[3px] ring-background"
                   >
                     {avatarBusy ? <Spinner className="h-4 w-4 text-accent-foreground" /> : <Camera className="h-4 w-4" strokeWidth={2.5} />}
                   </motion.button>
@@ -246,7 +246,7 @@ export default function Profile() {
               )}
             >
               {tab === key && (
-                <motion.span layoutId="profile-tab" transition={spring.bouncy} className="absolute inset-0 rounded-full bg-accent" />
+                <motion.span layoutId="profile-tab" transition={spring.bouncy} className="glitch-bg absolute inset-0 rounded-full" />
               )}
               <span className="relative flex items-center gap-2">
                 <Icon className="h-4 w-4" strokeWidth={2.5} /> {label}

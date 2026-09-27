@@ -215,7 +215,7 @@ export default function Chat() {
                       onClick={() => m.failed && send(m.content, m.id)}
                       className={cn(
                         "max-w-[78%] whitespace-pre-wrap break-words rounded-[20px] px-3.5 py-2 text-left text-[15px] leading-snug transition-opacity",
-                        mine ? "bg-accent font-medium text-accent-foreground" : "bg-muted text-foreground",
+                        mine ? "glitch-bg font-medium text-accent-foreground" : "bg-muted text-foreground",
                         mine && !groupedWithNext && "rounded-br-md",
                         !mine && !groupedWithNext && "rounded-bl-md",
                         m.pending && "opacity-60",

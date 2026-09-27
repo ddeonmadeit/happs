@@ -254,7 +254,7 @@ export default function Camera() {
             <X className="h-6 w-6" />
           </IconButton>
           {recording ? (
-            <span className="flex items-center gap-2 rounded-full bg-accent px-3.5 py-1.5 text-sm font-bold tabular-nums text-accent-foreground">
+            <span className="glitch-bg flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-bold tabular-nums text-accent-foreground">
               <span className="h-2 w-2 animate-pulse rounded-full bg-accent-foreground" />
               0:{String(Math.floor(elapsed)).padStart(2, "0")} / 0:{MAX_VIDEO_SECONDS}
             </span>
@@ -320,7 +320,7 @@ export default function Camera() {
                   cy="40"
                   r="36"
                   fill="none"
-                  stroke="hsl(25 100% 55%)"
+                  stroke="hsl(16 81% 49%)"
                   strokeWidth="4"
                   strokeLinecap="round"
                   strokeDasharray={circumference}
@@ -333,8 +333,8 @@ export default function Camera() {
               className={cn(
                 "transition-all duration-300 ease-spring",
                 mode === "photo" && "h-[62px] w-[62px] rounded-full bg-white",
-                mode === "video" && !recording && "h-[58px] w-[58px] rounded-full bg-accent",
-                mode === "video" && recording && "h-7 w-7 rounded-lg bg-accent",
+                mode === "video" && !recording && "glitch-bg h-[58px] w-[58px] rounded-full",
+                mode === "video" && recording && "glitch-bg h-7 w-7 rounded-lg",
               )}
             />
           </motion.button>

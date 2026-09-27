@@ -216,7 +216,7 @@ export default function MapPage({ active }: { active: boolean }) {
             animate={{ scale: 1, rotate: 0 }}
             whileTap={{ scale: 0.86, rotate: 45 }}
             transition={{ ...spring.bouncy, delay: 0.25 }}
-            className="pointer-events-auto flex h-[68px] w-[68px] items-center justify-center rounded-full bg-accent text-accent-foreground shadow-[0_10px_30px_-6px_hsl(var(--accent)/0.7)]"
+            className="glitch-bg pointer-events-auto flex h-[68px] w-[68px] items-center justify-center rounded-full text-accent-foreground shadow-[0_10px_30px_-6px_hsl(var(--accent)/0.7)]"
           >
             <HappsMark className="h-9 w-9" />
           </motion.button>

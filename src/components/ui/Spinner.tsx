@@ -15,7 +15,7 @@ export function FullScreenLoader() {
         animate={{ y: [0, -14, 0], scale: [1, 1.06, 1] }}
         transition={{ duration: 0.9, repeat: Infinity, ease: [0.34, 1.56, 0.64, 1] }}
       >
-        <HappsMark className="h-12 w-12 text-accent" />
+        <HappsMark glitch className="h-12 w-12" />
       </motion.div>
     </div>
   );

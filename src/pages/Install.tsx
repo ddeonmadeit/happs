@@ -31,11 +31,11 @@ export default function Install() {
             initial={{ scale: 0, rotate: -90 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={spring.bouncy}
-            className="mx-auto flex h-24 w-24 items-center justify-center rounded-[30px] bg-accent text-accent-foreground shadow-[0_16px_40px_-10px_hsl(var(--accent)/0.6)]"
+            className="glitch-bg mx-auto flex h-24 w-24 items-center justify-center rounded-[30px] text-accent-foreground shadow-[0_16px_40px_-10px_hsl(var(--accent)/0.6)]"
           >
             <HappsMark className="h-12 w-12" />
           </motion.span>
-          <Wordmark className="block text-5xl text-accent" />
+          <Wordmark className="text-5xl" />
         </div>
 
         {isInstalled ? (
