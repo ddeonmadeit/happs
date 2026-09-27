@@ -1,15 +1,14 @@
 import { forwardRef, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
-/* The old Create Happ form used bg-white inputs, which were white-on-white in dark mode. */
 const fieldBase =
-  "w-full rounded-2xl border border-transparent bg-muted/70 px-4 text-[16px] text-foreground placeholder:text-muted-foreground/70 transition-colors duration-200 focus:border-ring/50 focus:bg-muted focus:outline-none disabled:opacity-60";
+  "w-full rounded-2xl border-2 border-transparent bg-muted px-4 text-[16px] text-foreground placeholder:text-muted-foreground/70 transition-[border-color,background-color] duration-200 focus:border-accent/70 focus:outline-none disabled:opacity-60";
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }>(
   ({ className, invalid, ...props }, ref) => (
     <input
       ref={ref}
-      className={cn(fieldBase, "h-12", invalid && "border-destructive/70 focus:border-destructive", className)}
+      className={cn(fieldBase, "h-[52px]", invalid && "border-destructive/70 focus:border-destructive", className)}
       {...props}
     />
   ),
@@ -38,7 +37,7 @@ export function Field({ label, htmlFor, hint, error, required, counter, children
   return (
     <div className={cn("space-y-2", className)}>
       <div className="flex items-baseline justify-between px-1">
-        <label htmlFor={htmlFor} className="text-sm font-medium text-foreground">
+        <label htmlFor={htmlFor} className="text-sm font-semibold text-foreground">
           {label}
           {required && <span className="ml-0.5 text-accent">*</span>}
         </label>

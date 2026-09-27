@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { motion } from "motion/react";
 import { Camera, Grid3X3, MapPin, MessageCircle, Play, Settings, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import type { ProfileRow } from "@/integrations/supabase/types";
+import type { HappRow, ProfileRow } from "@/integrations/supabase/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { TopBar } from "@/components/TopBar";
 import { SettingsSheet } from "@/components/SettingsSheet";
@@ -12,20 +13,14 @@ import { Button, IconButton } from "@/components/ui/Button";
 import { Field, Input, Textarea } from "@/components/ui/Input";
 import { Sheet } from "@/components/ui/Sheet";
 import { FullScreenLoader, Spinner } from "@/components/ui/Spinner";
+import { Screen, Stagger, StaggerItem, spring } from "@/components/motion";
+import { fetchJoinedHapps, getOrCreateConversation } from "@/lib/api";
 import { normalizeUsername, validateUsername } from "@/lib/constants";
 import { resizeImage, uploadMedia } from "@/lib/media";
 import { cn, errorMessage, shortTimeAgo } from "@/lib/utils";
 
 type GridPost = { id: string; media_url: string; media_type: "image" | "video"; happ_id: string };
-type JoinedHapp = {
-  id: string;
-  name: string;
-  suburb: string | null;
-  icon_url: string | null;
-  is_active: boolean;
-  last_activity_at: string;
-  creator_id: string;
-};
+type JoinedHapp = HappRow;
 
 export default function Profile() {
   const { userId } = useParams<{ userId: string }>();
@@ -83,16 +78,7 @@ export default function Profile() {
   // The old "happs" tab just showed the posts grid again.
   useEffect(() => {
     if (tab !== "happs" || happs !== null || !targetId) return;
-    supabase
-      .from("happ_participants")
-      .select("joined_at, happ:happs(id, name, suburb, icon_url, is_active, last_activity_at, creator_id)")
-      .eq("user_id", targetId)
-      .order("joined_at", { ascending: false })
-      .limit(60)
-      .then(({ data }) => {
-        const rows = (data as unknown as { happ: JoinedHapp | null }[]) ?? [];
-        setHapps(rows.map((r) => r.happ).filter((h): h is JoinedHapp => Boolean(h)));
-      });
+    fetchJoinedHapps(targetId).then(setHapps);
   }, [tab, happs, targetId]);
 
   const toggleFollow = async () => {
@@ -113,15 +99,15 @@ export default function Profile() {
   };
 
   const startMessage = async () => {
-    if (!targetId) return;
+    if (!targetId || !user) return;
     setMessageBusy(true);
-    const { data, error } = await supabase.rpc("get_or_create_conversation", { p_other_user: targetId });
-    setMessageBusy(false);
-    if (error || !data) {
-      toast.error(errorMessage(error, "Couldn't open the conversation"));
-      return;
+    try {
+      navigate(`/messages/${await getOrCreateConversation(user.id, targetId)}`);
+    } catch (err) {
+      toast.error(errorMessage(err, "Couldn't open the conversation"));
+    } finally {
+      setMessageBusy(false);
     }
-    navigate(`/messages/${data}`);
   };
 
   const changeAvatar = async (file?: File) => {
@@ -154,20 +140,20 @@ export default function Profile() {
 
   if (!profile) {
     return (
-      <div className="flex min-h-dvh-screen flex-col bg-background">
+      <Screen>
         <TopBar />
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
           <UserRound className="h-10 w-10 text-muted-foreground" />
-          <p className="font-medium">This account doesn’t exist</p>
+          <p className="text-lg font-bold">This account doesn’t exist</p>
         </div>
-      </div>
+      </Screen>
     );
   }
 
   const name = profile.display_name || profile.username || "No name";
 
   return (
-    <div className="flex min-h-dvh-screen flex-col bg-background">
+    <Screen>
       <TopBar
         title={profile.username ? `@${profile.username}` : "Profile"}
         right={
@@ -179,21 +165,25 @@ export default function Profile() {
         }
       />
 
-      <main className="mx-auto w-full max-w-lg flex-1">
+      <main className="scroll-area mx-auto min-h-0 w-full max-w-lg flex-1">
         <section className="space-y-5 px-5 pb-5 pt-2">
           <div className="flex items-center gap-6">
             <div className="relative">
-              <Avatar src={profile.avatar_url} name={name} size="h-20 w-20" className="text-2xl ring-2 ring-accent/40 ring-offset-2 ring-offset-background" />
+              <motion.div initial={{ scale: 0.6 }} animate={{ scale: 1 }} transition={spring.bouncy}>
+                <Avatar src={profile.avatar_url} name={name} size="h-[88px] w-[88px]" className="text-3xl ring-[3px] ring-accent ring-offset-[3px] ring-offset-background" />
+              </motion.div>
               {isOwn && (
                 <>
-                  <button
+                  <motion.button
                     type="button"
                     onClick={() => avatarInput.current?.click()}
                     aria-label="Change profile photo"
-                    className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md ring-2 ring-background transition-transform active:scale-90"
+                    whileTap={{ scale: 0.8 }}
+                    transition={spring.bouncy}
+                    className="absolute -bottom-1 -right-1 flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md ring-[3px] ring-background"
                   >
-                    {avatarBusy ? <Spinner className="h-4 w-4 text-accent-foreground" /> : <Camera className="h-4 w-4" />}
-                  </button>
+                    {avatarBusy ? <Spinner className="h-4 w-4 text-accent-foreground" /> : <Camera className="h-4 w-4" strokeWidth={2.5} />}
+                  </motion.button>
                   <input ref={avatarInput} type="file" accept="image/*" hidden onChange={(e) => changeAvatar(e.target.files?.[0])} />
                 </>
               )}
@@ -205,15 +195,15 @@ export default function Profile() {
                 ["Following", stats.following],
               ].map(([label, value]) => (
                 <div key={label}>
-                  <dd className="text-lg font-bold tabular-nums">{value}</dd>
-                  <dt className="text-xs text-muted-foreground">{label}</dt>
+                  <dd className="text-xl font-extrabold tabular-nums">{value}</dd>
+                  <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
                 </div>
               ))}
             </dl>
           </div>
 
           <div>
-            <h2 className="text-[17px] font-semibold">{name}</h2>
+            <h2 className="text-xl font-extrabold tracking-tight">{name}</h2>
             {profile.bio ? (
               <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed text-foreground/85">{profile.bio}</p>
             ) : (
@@ -237,7 +227,7 @@ export default function Profile() {
           )}
         </section>
 
-        <div className="sticky top-[calc(max(env(safe-area-inset-top),0.75rem)+3.25rem)] z-20 flex border-b border-border bg-background/90 backdrop-blur-xl" role="tablist">
+        <div className="sticky top-0 z-20 mx-5 mb-1 flex rounded-full bg-muted p-1" role="tablist">
           {(
             [
               ["posts", Grid3X3, "Posts"],
@@ -251,17 +241,16 @@ export default function Profile() {
               aria-selected={tab === key}
               onClick={() => setTab(key)}
               className={cn(
-                "relative flex flex-1 items-center justify-center gap-2 py-3 text-sm font-medium transition-colors",
-                tab === key ? "text-foreground" : "text-muted-foreground",
+                "relative flex flex-1 items-center justify-center gap-2 rounded-full py-2.5 text-sm font-bold transition-colors",
+                tab === key ? "text-accent-foreground" : "text-muted-foreground",
               )}
             >
-              <Icon className="h-4 w-4" /> {label}
-              <span
-                className={cn(
-                  "absolute inset-x-8 bottom-0 h-0.5 rounded-full bg-foreground transition-transform duration-300 ease-smooth",
-                  tab === key ? "scale-x-100" : "scale-x-0",
-                )}
-              />
+              {tab === key && (
+                <motion.span layoutId="profile-tab" transition={spring.bouncy} className="absolute inset-0 rounded-full bg-accent" />
+              )}
+              <span className="relative flex items-center gap-2">
+                <Icon className="h-4 w-4" strokeWidth={2.5} /> {label}
+              </span>
             </button>
           ))}
         </div>
@@ -270,12 +259,12 @@ export default function Profile() {
           posts.length === 0 ? (
             <EmptyTab icon={<Grid3X3 className="h-8 w-8" />} text={isOwn ? "Your posts will show up here" : "No posts yet"} />
           ) : (
-            <div className="grid grid-cols-3 gap-0.5 pb-safe">
+            <Stagger as="div" className="grid grid-cols-3 gap-1 px-1 pb-safe pt-2">
               {posts.map((p) => (
+                <StaggerItem as="div" key={p.id}>
                 <Link
-                  key={p.id}
                   to={`/happ/${p.happ_id}/story/${targetId}?post=${p.id}`}
-                  className="relative aspect-square overflow-hidden bg-muted"
+                  className="relative block aspect-square overflow-hidden rounded-2xl bg-muted"
                 >
                   {p.media_type === "video" ? (
                     <>
@@ -283,11 +272,12 @@ export default function Profile() {
                       <Play className="absolute right-2 top-2 h-4 w-4 fill-white text-white drop-shadow" />
                     </>
                   ) : (
-                    <img src={p.media_url} alt="" loading="lazy" className="h-full w-full object-cover transition-opacity hover:opacity-90" />
+                    <img src={p.media_url} alt="" loading="lazy" className="h-full w-full object-cover" />
                   )}
                 </Link>
+                </StaggerItem>
               ))}
-            </div>
+            </Stagger>
           )
         ) : happs === null ? (
           <div className="flex justify-center py-12">
@@ -296,13 +286,13 @@ export default function Profile() {
         ) : happs.length === 0 ? (
           <EmptyTab icon={<MapPin className="h-8 w-8" />} text={isOwn ? "Happs you join or create show up here" : "No happs yet"} />
         ) : (
-          <ul className="divide-y divide-border pb-safe">
+          <Stagger className="space-y-1 px-2 pb-safe pt-2">
             {happs.map((h) => (
-              <li key={h.id}>
-                <Link to={`/happ/${h.id}`} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-muted/50">
-                  <Avatar src={h.icon_url} name={h.name} size="h-12 w-12" className={cn("ring-2", h.is_active ? "ring-live" : "ring-dead")} />
+              <StaggerItem key={h.id}>
+                <Link to={`/happ/${h.id}`} className="flex items-center gap-3 rounded-3xl px-3 py-2.5 active:bg-muted">
+                  <Avatar src={h.icon_url} name={h.name} size="h-12 w-12" className={cn("rounded-2xl ring-2", h.is_active ? "ring-accent" : "ring-dead")} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{h.name}</span>
+                    <span className="block truncate text-[15px] font-bold">{h.name}</span>
                     <span className="block truncate text-sm text-muted-foreground">
                       {h.creator_id === targetId ? "Created" : "Joined"}
                       {h.suburb ? ` · ${h.suburb}` : ""}
@@ -310,9 +300,9 @@ export default function Profile() {
                   </span>
                   <span className="text-xs text-muted-foreground">{shortTimeAgo(h.last_activity_at)}</span>
                 </Link>
-              </li>
+              </StaggerItem>
             ))}
-          </ul>
+          </Stagger>
         )}
       </main>
 
@@ -330,14 +320,14 @@ export default function Profile() {
           <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
         </>
       )}
-    </div>
+    </Screen>
   );
 }
 
 function EmptyTab({ icon, text }: { icon: ReactNode; text: string }) {
   return (
     <div className="flex flex-col items-center gap-3 px-8 py-16 text-center text-muted-foreground">
-      <span className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">{icon}</span>
+      <span className="flex h-16 w-16 items-center justify-center rounded-full bg-accent/10 text-accent">{icon}</span>
       <p className="text-sm">{text}</p>
     </div>
   );

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./AuthContext";
+import { supportsPush } from "@/lib/api";
 
 type PushContextValue = {
   /** Browser can do web push and the backend has a VAPID key. */
@@ -65,10 +66,11 @@ export function PushProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!supported || !user) return;
     let cancelled = false;
-    supabase.functions
-      .invoke<{ publicKey?: string }>("get-vapid-key")
-      .then(({ data }) => {
-        if (!cancelled && data?.publicKey) setVapidKey(data.publicKey);
+    // The original backend never stored subscriptions, so push stays off there.
+    supportsPush()
+      .then((ok) => (ok ? supabase.functions.invoke<{ publicKey?: string }>("get-vapid-key") : null))
+      .then((res) => {
+        if (!cancelled && res?.data?.publicKey) setVapidKey(res.data.publicKey);
       })
       .catch(() => {});
     return () => {
@@ -89,7 +91,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
       endpointRef.current = sub?.endpoint ?? null;
       setIsSubscribed(Boolean(sub));
       // Make sure the backend knows this browser belongs to the signed-in user.
-      if (sub) {
+      if (sub && (await supportsPush())) {
         const json = sub.toJSON();
         await supabase.rpc("save_push_subscription", {
           p_endpoint: sub.endpoint,

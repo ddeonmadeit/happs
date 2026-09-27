@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEve
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowUp, ChevronLeft } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
+import { motion } from "motion/react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { MessageRow, ProfileRow } from "@/integrations/supabase/types";
@@ -12,6 +13,8 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Button, IconButton } from "@/components/ui/Button";
 import { FullScreenLoader } from "@/components/ui/Spinner";
 import { requestPush } from "@/lib/push";
+import { afterMessageSent, fetchProfiles, markConversationRead } from "@/lib/api";
+import { Screen, spring } from "@/components/motion";
 import { cn } from "@/lib/utils";
 
 type ChatMessage = MessageRow & { pending?: boolean; failed?: boolean };
@@ -36,8 +39,8 @@ export default function Chat() {
   const stickToBottom = useRef(true);
 
   const markRead = useCallback(() => {
-    if (conversationId) supabase.rpc("mark_conversation_read", { p_conversation_id: conversationId }).then(() => undefined);
-  }, [conversationId]);
+    if (conversationId && user) markConversationRead(conversationId, user.id).catch(() => undefined);
+  }, [conversationId, user]);
 
   useEffect(() => {
     if (!conversationId || !user) return;
@@ -55,8 +58,8 @@ export default function Chat() {
         return;
       }
       const otherId = convo.participant_1 === user.id ? convo.participant_2 : convo.participant_1;
-      const [profileRes, messagesRes] = await Promise.all([
-        supabase.from("profiles").select("user_id, username, display_name, avatar_url").eq("user_id", otherId).maybeSingle(),
+      const [profiles, messagesRes] = await Promise.all([
+        fetchProfiles([otherId]),
         supabase
           .from("messages")
           .select("*")
@@ -65,7 +68,7 @@ export default function Chat() {
           .limit(200),
       ]);
       if (cancelled) return;
-      setOther(profileRes.data);
+      setOther(profiles.get(otherId) ?? null);
       setMessages(((messagesRes.data as ChatMessage[]) ?? []).reverse());
       setLoading(false);
       markRead();
@@ -135,6 +138,7 @@ export default function Chat() {
       const withoutTemp = list.filter((m) => m.id !== tempId);
       return withoutTemp.some((m) => m.id === data.id) ? withoutTemp : [...withoutTemp, data];
     });
+    afterMessageSent(conversationId);
     requestPush({ type: "message", message_id: data.id });
   };
 
@@ -150,33 +154,33 @@ export default function Chat() {
 
   if (notFound) {
     return (
-      <div className="flex h-dvh-screen flex-col items-center justify-center gap-4 bg-background p-8 text-center">
-        <p className="font-medium">Conversation not found</p>
+      <Screen className="items-center justify-center gap-4 p-8 text-center">
+        <p className="text-lg font-bold">Conversation not found</p>
         <Button variant="secondary" onClick={() => navigate("/messages", { replace: true })}>
           Back to messages
         </Button>
-      </div>
+      </Screen>
     );
   }
 
   const name = other?.display_name || other?.username || "User";
 
   return (
-    <div className="flex h-dvh-screen flex-col bg-background">
-      <header className="z-10 flex items-center gap-2 border-b border-border/60 bg-background/85 px-3 pb-2 pt-safe backdrop-blur-xl">
-        <IconButton label="Back" variant="ghost" onClick={goBack}>
-          <ChevronLeft className="h-6 w-6" />
+    <Screen>
+      <header className="z-10 flex shrink-0 items-center gap-2 px-3 pb-2 pt-safe">
+        <IconButton label="Back" onClick={goBack}>
+          <ChevronLeft className="h-6 w-6" strokeWidth={2.5} />
         </IconButton>
         <Link to={other ? `/profile/${other.user_id}` : "#"} className="flex min-w-0 flex-1 items-center gap-3">
           <Avatar src={other?.avatar_url} name={name} size="h-9 w-9" />
           <span className="min-w-0">
-            <span className="block truncate font-semibold leading-tight">{name}</span>
+            <span className="block truncate text-[16px] font-extrabold leading-tight">{name}</span>
             {other?.username && <span className="block truncate text-xs text-muted-foreground">@{other.username}</span>}
           </span>
         </Link>
       </header>
 
-      <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto overscroll-contain px-3 py-4">
+      <div ref={scrollRef} onScroll={onScroll} className="scroll-area min-h-0 flex-1 px-3 py-4">
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
             <Avatar src={other?.avatar_url} name={name} size="h-20 w-20" className="text-2xl" />
@@ -194,7 +198,15 @@ export default function Chat() {
               const groupedWithNext =
                 next && next.sender_id === m.sender_id && new Date(next.created_at).getTime() - time.getTime() < 60 * 1000;
               return (
-                <li key={m.id} className="flex flex-col">
+                <motion.li
+                  key={m.id}
+                  layout="position"
+                  initial={{ opacity: 0, y: 16, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={spring.bouncy}
+                  style={{ originX: mine ? 1 : 0 }}
+                  className="flex flex-col"
+                >
                   {showTime && <span className="my-3 text-center text-[11px] font-medium text-muted-foreground">{dayLabel(time)}</span>}
                   <div className={cn("flex", mine ? "justify-end" : "justify-start", !groupedWithNext && "mb-1.5")}>
                     <button
@@ -203,7 +215,7 @@ export default function Chat() {
                       onClick={() => m.failed && send(m.content, m.id)}
                       className={cn(
                         "max-w-[78%] whitespace-pre-wrap break-words rounded-[20px] px-3.5 py-2 text-left text-[15px] leading-snug transition-opacity",
-                        mine ? "bg-accent text-accent-foreground" : "bg-muted text-foreground",
+                        mine ? "bg-accent font-medium text-accent-foreground" : "bg-muted text-foreground",
                         mine && !groupedWithNext && "rounded-br-md",
                         !mine && !groupedWithNext && "rounded-bl-md",
                         m.pending && "opacity-60",
@@ -217,14 +229,14 @@ export default function Chat() {
                   {mine && !next && !m.pending && !m.failed && (
                     <span className="mb-1 mr-1 text-right text-[11px] text-muted-foreground">{m.is_read ? "Seen" : "Sent"}</span>
                   )}
-                </li>
+                </motion.li>
               );
             })}
           </ol>
         )}
       </div>
 
-      <form onSubmit={submit} className="flex items-end gap-2 border-t border-border/60 bg-background px-3 pb-safe pt-2">
+      <form onSubmit={submit} className="flex shrink-0 items-end gap-2 px-3 pb-safe pt-2">
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -232,12 +244,12 @@ export default function Chat() {
           placeholder="Message…"
           aria-label="Message"
           enterKeyHint="send"
-          className="h-11 flex-1 rounded-full bg-muted/70 px-4 text-[16px] placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring/30"
+          className="h-12 flex-1 rounded-full border-2 border-transparent bg-muted px-5 text-[16px] placeholder:text-muted-foreground/70 focus:border-accent/70 focus:outline-none"
         />
-        <IconButton type="submit" label="Send" variant="accent" disabled={!text.trim()}>
+        <IconButton type="submit" label="Send" variant="accent" disabled={!text.trim()} className="h-12 w-12">
           <ArrowUp className="h-5 w-5" strokeWidth={2.5} />
         </IconButton>
       </form>
-    </div>
+    </Screen>
   );
 }

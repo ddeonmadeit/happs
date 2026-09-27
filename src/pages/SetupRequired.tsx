@@ -3,11 +3,11 @@ import { HappsMark, Wordmark } from "@/components/Logo";
 /** Shown instead of a blank crash when the Supabase env vars are missing. */
 export default function SetupRequired() {
   return (
-    <div className="flex min-h-dvh-screen items-center justify-center bg-background p-6">
+    <div className="scroll-area absolute inset-0 flex items-center justify-center bg-background p-6">
       <div className="w-full max-w-md space-y-6 text-center">
         <HappsMark className="mx-auto h-14 w-14 text-accent" />
         <Wordmark className="block text-5xl text-accent" />
-        <div className="space-y-3 rounded-3xl bg-card p-6 text-left shadow-sm">
+        <div className="space-y-3 rounded-4xl bg-card p-6 text-left">
           <h1 className="text-lg font-semibold">Connect a Supabase project</h1>
           <p className="text-sm text-muted-foreground">
             Copy <code className="rounded bg-muted px-1.5 py-0.5">.env.example</code> to{" "}

@@ -1,88 +1,61 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { AnimatePresence, motion, type PanInfo } from "motion/react";
 import { Heart, MessageCircle, Send, Volume2, VolumeX, X } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import type { PostRow } from "@/integrations/supabase/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGoBack } from "@/components/TopBar";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { FullScreenLoader, Spinner } from "@/components/ui/Spinner";
+import { Stagger, StaggerItem, spring } from "@/components/motion";
+import {
+  addComment,
+  fetchComments,
+  fetchHapp,
+  fetchProfiles,
+  fetchStory,
+  setLike,
+  type CommentWithProfile,
+  type ProfileLite,
+  type StoryPost,
+} from "@/lib/api";
 import { cn, shortTimeAgo } from "@/lib/utils";
-
-type ProfileLite = { username: string | null; display_name: string | null; avatar_url: string | null };
-
-type StoryPost = PostRow & {
-  likesCount: number;
-  commentsCount: number;
-  isLiked: boolean;
-};
-
-type Comment = { id: string; content: string; created_at: string; user_id: string; profile: ProfileLite | null };
 
 export default function Story() {
   const { id: happId, storyId: authorId } = useParams<{ id: string; storyId: string }>();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const goBack = useGoBack(happId ? `/happ/${happId}` : "/map");
+  const close = useGoBack(happId ? `/happ/${happId}` : "/map");
   const { user } = useAuth();
 
   const [posts, setPosts] = useState<StoryPost[]>([]);
-  const [author, setAuthor] = useState<ProfileLite | null>(null);
+  const [author, setAuthor] = useState<ProfileLite | undefined>();
   const [happName, setHappName] = useState<string | null>(null);
-  const [index, setIndex] = useState(0);
+  const [[index, direction], setPage] = useState<[number, number]>([0, 0]);
   const [loading, setLoading] = useState(true);
   const [muted, setMuted] = useState(true);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [heartBurst, setHeartBurst] = useState(0);
   const liking = useRef(false);
 
   useEffect(() => {
     if (!happId || !authorId) return;
     let cancelled = false;
     (async () => {
-      // Counts come back embedded, instead of 3 extra queries per post.
-      const [postsRes, authorRes, happRes] = await Promise.all([
-        supabase
-          .from("posts")
-          .select("*, post_likes(count), comments(count)")
-          .eq("happ_id", happId)
-          .eq("user_id", authorId)
-          .order("created_at", { ascending: false }),
-        supabase.from("profiles").select("username, display_name, avatar_url").eq("user_id", authorId).maybeSingle(),
-        supabase.from("happs").select("name").eq("id", happId).maybeSingle(),
+      const [list, profiles, happ] = await Promise.all([
+        fetchStory(happId, authorId, user?.id),
+        fetchProfiles([authorId]),
+        fetchHapp(happId),
       ]);
       if (cancelled) return;
-
-      type Raw = PostRow & { post_likes: { count: number }[]; comments: { count: number }[] };
-      const raw = (postsRes.data as unknown as Raw[]) ?? [];
-      let liked = new Set<string>();
-      if (user && raw.length) {
-        const { data } = await supabase
-          .from("post_likes")
-          .select("post_id")
-          .eq("user_id", user.id)
-          .in(
-            "post_id",
-            raw.map((p) => p.id),
-          );
-        liked = new Set((data ?? []).map((l) => l.post_id));
-      }
-      if (cancelled) return;
-
-      const list = raw.map(({ post_likes, comments, ...p }) => ({
-        ...p,
-        likesCount: post_likes?.[0]?.count ?? 0,
-        commentsCount: comments?.[0]?.count ?? 0,
-        isLiked: liked.has(p.id),
-      }));
       setPosts(list);
-      setAuthor(authorRes.data);
-      setHappName(happRes.data?.name ?? null);
-      // Open on the post that was tapped (the old viewer always started at the newest).
+      setAuthor(profiles.get(authorId));
+      setHappName(happ?.name ?? null);
+      // Open on the post that was tapped.
       const start = list.findIndex((p) => p.id === params.get("post"));
-      setIndex(start >= 0 ? start : 0);
+      setPage([start >= 0 ? start : 0, 0]);
       setLoading(false);
     })();
     return () => {
@@ -93,7 +66,11 @@ export default function Story() {
   const post = posts[index];
 
   const go = useCallback(
-    (delta: number) => setIndex((i) => Math.min(Math.max(i + delta, 0), Math.max(posts.length - 1, 0))),
+    (delta: number) =>
+      setPage(([i]) => {
+        const next = Math.min(Math.max(i + delta, 0), Math.max(posts.length - 1, 0));
+        return [next, delta];
+      }),
     [posts.length],
   );
 
@@ -102,40 +79,48 @@ export default function Story() {
       if (commentsOpen) return;
       if (e.key === "ArrowRight") go(1);
       if (e.key === "ArrowLeft") go(-1);
-      if (e.key === "Escape") goBack();
+      if (e.key === "Escape") close();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [go, goBack, commentsOpen]);
+  }, [go, close, commentsOpen]);
 
   const toggleLike = async () => {
     if (!user || !post || liking.current) return;
     liking.current = true;
-    const wasLiked = post.isLiked;
-    const patch = (liked: boolean) =>
+    const liked = !post.isLiked;
+    const patch = (value: boolean) =>
       setPosts((list) =>
         list.map((p) =>
-          p.id === post.id ? { ...p, isLiked: liked, likesCount: Math.max(0, p.likesCount + (liked ? 1 : -1)) } : p,
+          p.id === post.id ? { ...p, isLiked: value, likesCount: Math.max(0, p.likesCount + (value ? 1 : -1)) } : p,
         ),
       );
-    patch(!wasLiked);
-    const { error } = wasLiked
-      ? await supabase.from("post_likes").delete().eq("post_id", post.id).eq("user_id", user.id)
-      : await supabase.from("post_likes").insert({ post_id: post.id, user_id: user.id });
-    if (error && error.code !== "23505") {
-      patch(wasLiked);
+    patch(liked);
+    if (liked) setHeartBurst((n) => n + 1);
+    try {
+      await setLike(post.id, user.id, liked);
+    } catch {
+      patch(!liked);
       toast.error("Couldn't update like");
     }
     liking.current = false;
+  };
+
+  // Swipe: down closes, left/right changes post.
+  const onDragEnd = (_: unknown, info: PanInfo) => {
+    const { offset, velocity } = info;
+    if (offset.y > 120 || velocity.y > 800) close();
+    else if (offset.x < -80 || velocity.x < -600) go(1);
+    else if (offset.x > 80 || velocity.x > 600) go(-1);
   };
 
   if (loading) return <FullScreenLoader />;
 
   if (!post) {
     return (
-      <div className="flex h-dvh-screen flex-col items-center justify-center gap-4 bg-background p-8 text-center">
-        <p className="font-medium">No posts here yet</p>
-        <Button variant="secondary" onClick={goBack}>
+      <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4 bg-background p-8 text-center">
+        <p className="text-lg font-bold">No posts here yet</p>
+        <Button variant="secondary" onClick={close}>
           Go back
         </Button>
       </div>
@@ -143,42 +128,85 @@ export default function Story() {
   }
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-black text-white">
-      {/* Media */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        {post.media_type === "video" ? (
-          <video
+    <motion.div
+      initial={{ opacity: 0, scale: 0.92 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+      transition={spring.snappy}
+      className="absolute inset-0 z-40 flex flex-col overflow-hidden bg-black text-white"
+    >
+      {/* Media: drag to navigate / dismiss */}
+      <motion.div
+        className="absolute inset-0"
+        drag
+        dragSnapToOrigin
+        dragElastic={{ top: 0.1, bottom: 0.6, left: 0.3, right: 0.3 }}
+        dragConstraints={{ top: 0, bottom: 0, left: 0, right: 0 }}
+        onDragEnd={onDragEnd}
+      >
+        <AnimatePresence initial={false} custom={direction}>
+          <motion.div
             key={post.id}
-            src={post.media_url}
-            className="h-full w-full object-contain"
-            autoPlay
-            playsInline
-            loop
-            muted={muted}
-          />
-        ) : (
-          <img key={post.id} src={post.media_url} alt={post.caption ?? "Post"} className="h-full w-full animate-fade-up object-contain" />
-        )}
-      </div>
+            custom={direction}
+            variants={{
+              enter: (d: number) => ({ x: d > 0 ? "100%" : d < 0 ? "-100%" : 0, opacity: d === 0 ? 0 : 1, scale: 0.96 }),
+              center: { x: 0, opacity: 1, scale: 1 },
+              exit: (d: number) => ({ x: d > 0 ? "-35%" : "35%", opacity: 0, scale: 0.9 }),
+            }}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={spring.snappy}
+            className="absolute inset-0 flex items-center justify-center"
+            onDoubleClick={() => !post.isLiked && toggleLike()}
+          >
+            {post.media_type === "video" ? (
+              <video src={post.media_url} className="h-full w-full object-contain" autoPlay playsInline loop muted={muted} />
+            ) : (
+              <img src={post.media_url} alt={post.caption ?? "Post"} className="h-full w-full object-contain" draggable={false} />
+            )}
+          </motion.div>
+        </AnimatePresence>
 
-      {/* Tap zones */}
-      <button type="button" aria-label="Previous" className="absolute inset-y-0 left-0 z-10 w-1/3" onClick={() => go(-1)} />
-      <button type="button" aria-label="Next" className="absolute inset-y-0 right-0 z-10 w-1/3" onClick={() => go(1)} />
+        {/* Tap zones */}
+        <button type="button" aria-label="Previous" className="absolute inset-y-0 left-0 w-1/3" onClick={() => go(-1)} />
+        <button type="button" aria-label="Next" className="absolute inset-y-0 right-0 w-1/3" onClick={() => go(1)} />
+
+        <AnimatePresence>
+          {heartBurst > 0 && (
+            <motion.div
+              key={heartBurst}
+              initial={{ scale: 0, opacity: 1 }}
+              animate={{ scale: [0, 1.3, 1], opacity: [1, 1, 0] }}
+              transition={{ duration: 0.8, times: [0, 0.4, 1] }}
+              onAnimationComplete={() => setHeartBurst(0)}
+              className="pointer-events-none absolute inset-0 flex items-center justify-center"
+            >
+              <Heart className="h-28 w-28 fill-accent text-accent drop-shadow-2xl" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
 
       {/* Top */}
-      <div className="relative z-20 bg-gradient-to-b from-black/60 to-transparent px-3 pb-8 pt-safe">
+      <div className="pointer-events-none relative z-20 bg-gradient-to-b from-black/70 to-transparent px-3 pb-10 pt-safe">
         <div className="flex gap-1">
           {posts.map((p, i) => (
-            <span key={p.id} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/30">
-              <span className={cn("block h-full bg-white transition-all duration-300", i <= index ? "w-full" : "w-0")} />
+            <span key={p.id} className="h-[3px] flex-1 overflow-hidden rounded-full bg-white/25">
+              <motion.span
+                className="block h-full rounded-full bg-white"
+                initial={false}
+                animate={{ width: i <= index ? "100%" : "0%" }}
+                transition={spring.snappy}
+              />
             </span>
           ))}
         </div>
-        <div className="mt-3 flex items-center gap-3">
+        <div className="pointer-events-auto mt-3 flex items-center gap-3">
           <Link to={`/profile/${post.user_id}`} className="flex min-w-0 flex-1 items-center gap-2.5">
-            <Avatar src={author?.avatar_url} name={author?.display_name || author?.username} size="h-9 w-9" className="ring-2 ring-white/20" />
+            <Avatar src={author?.avatar_url} name={author?.display_name || author?.username} size="h-10 w-10" className="ring-2 ring-accent" />
             <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold">{author?.username ? `@${author.username}` : "User"}</span>
+              <span className="block truncate text-[15px] font-bold">{author?.username ? `@${author.username}` : "User"}</span>
               <span className="block truncate text-xs text-white/70">
                 {happName ? `${happName} · ` : ""}
                 {shortTimeAgo(post.created_at)}
@@ -186,11 +214,11 @@ export default function Story() {
             </span>
           </Link>
           {post.media_type === "video" && (
-            <IconButton label={muted ? "Unmute" : "Mute"} variant="ghost" className="text-white hover:bg-white/10" onClick={() => setMuted((m) => !m)}>
+            <IconButton label={muted ? "Unmute" : "Mute"} className="bg-white/15 text-white backdrop-blur-md" onClick={() => setMuted((m) => !m)}>
               {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
             </IconButton>
           )}
-          <IconButton label="Close" variant="ghost" className="text-white hover:bg-white/10" onClick={goBack}>
+          <IconButton label="Close" className="bg-white/15 text-white backdrop-blur-md" onClick={close}>
             <X className="h-6 w-6" />
           </IconButton>
         </div>
@@ -199,28 +227,39 @@ export default function Story() {
       <div className="flex-1" />
 
       {/* Bottom */}
-      <div className="relative z-20 bg-gradient-to-t from-black/70 via-black/40 to-transparent px-4 pb-safe pt-16">
-        {post.caption && <p className="mb-4 text-[15px] leading-relaxed">{post.caption}</p>}
-        <div className="flex items-center gap-2 pb-1">
-          <button
+      <div className="pointer-events-none relative z-20 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-4 pb-safe pt-20">
+        {post.caption && (
+          <motion.p key={post.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4 text-[16px] font-medium leading-relaxed">
+            {post.caption}
+          </motion.p>
+        )}
+        <div className="pointer-events-auto flex items-center gap-2 pb-1">
+          <motion.button
             type="button"
             onClick={toggleLike}
             aria-pressed={post.isLiked}
             aria-label={post.isLiked ? "Unlike" : "Like"}
-            className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2.5 backdrop-blur-md transition-transform active:scale-90"
+            whileTap={{ scale: 0.8 }}
+            transition={spring.bouncy}
+            className="flex items-center gap-2 rounded-full bg-white/15 px-4 py-3 backdrop-blur-md"
           >
-            <Heart className={cn("h-5 w-5 transition-all duration-200", post.isLiked && "scale-110 fill-red-500 text-red-500")} />
-            <span className="text-sm font-semibold tabular-nums">{post.likesCount}</span>
-          </button>
-          <button
+            <motion.span key={String(post.isLiked)} initial={{ scale: 0.5 }} animate={{ scale: 1 }} transition={spring.bouncy}>
+              <Heart className={cn("h-5 w-5", post.isLiked && "fill-accent text-accent")} />
+            </motion.span>
+            <span className="text-sm font-bold tabular-nums">{post.likesCount}</span>
+          </motion.button>
+          <motion.button
             type="button"
             onClick={() => setCommentsOpen(true)}
-            className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2.5 backdrop-blur-md transition-transform active:scale-90"
+            aria-label="Comments"
+            whileTap={{ scale: 0.8 }}
+            transition={spring.bouncy}
+            className="flex items-center gap-2 rounded-full bg-white/15 px-4 py-3 backdrop-blur-md"
           >
             <MessageCircle className="h-5 w-5" />
-            <span className="text-sm font-semibold tabular-nums">{post.commentsCount}</span>
-          </button>
-          <span className="ml-auto text-xs tabular-nums text-white/60">
+            <span className="text-sm font-bold tabular-nums">{post.commentsCount}</span>
+          </motion.button>
+          <span className="ml-auto text-xs font-semibold tabular-nums text-white/60">
             {index + 1} / {posts.length}
           </span>
         </div>
@@ -235,7 +274,7 @@ export default function Story() {
         }
         onProfile={(uid) => navigate(`/profile/${uid}`)}
       />
-    </div>
+    </motion.div>
   );
 }
 
@@ -252,8 +291,8 @@ function CommentsSheet({
   onAdded: () => void;
   onProfile: (userId: string) => void;
 }) {
-  const { user } = useAuth();
-  const [comments, setComments] = useState<Comment[] | null>(null);
+  const { user, profile } = useAuth();
+  const [comments, setComments] = useState<CommentWithProfile[] | null>(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const listEnd = useRef<HTMLDivElement>(null);
@@ -262,21 +301,16 @@ function CommentsSheet({
     if (!open) return;
     let cancelled = false;
     setComments(null);
-    supabase
-      .from("comments")
-      .select("id, content, created_at, user_id, profile:profiles(username, display_name, avatar_url)")
-      .eq("post_id", postId)
-      .order("created_at", { ascending: true })
-      .then(({ data }) => {
-        if (!cancelled) setComments((data as unknown as Comment[]) ?? []);
-      });
+    fetchComments(postId).then((list) => {
+      if (!cancelled) setComments(list);
+    });
     return () => {
       cancelled = true;
     };
   }, [open, postId]);
 
   useEffect(() => {
-    listEnd.current?.scrollIntoView({ block: "end" });
+    listEnd.current?.scrollIntoView({ block: "end", behavior: "smooth" });
   }, [comments]);
 
   const submit = async (e: FormEvent) => {
@@ -284,61 +318,60 @@ function CommentsSheet({
     const content = text.trim();
     if (!content || !user) return;
     setSending(true);
-    const { data, error } = await supabase
-      .from("comments")
-      .insert({ post_id: postId, user_id: user.id, content })
-      .select("id, content, created_at, user_id, profile:profiles(username, display_name, avatar_url)")
-      .single();
-    setSending(false);
-    if (error || !data) {
+    try {
+      const row = await addComment(postId, user.id, content);
+      setText("");
+      setComments((list) => [...(list ?? []), { ...row, profile: profile ?? undefined }]);
+      onAdded();
+    } catch {
       toast.error("Couldn't post your comment");
-      return;
+    } finally {
+      setSending(false);
     }
-    setText("");
-    setComments((list) => [...(list ?? []), data as unknown as Comment]);
-    onAdded();
   };
 
   return (
     <Sheet open={open} onClose={onClose} title="Comments">
-      <div className="-mx-1 max-h-[45dvh] min-h-[8rem] overflow-y-auto px-1">
+      <div className="min-h-[9rem]">
         {comments === null ? (
           <div className="flex justify-center py-8">
             <Spinner />
           </div>
         ) : comments.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">No comments yet. Say something nice.</p>
+          <p className="py-8 text-center text-muted-foreground">No comments yet. Say something nice.</p>
         ) : (
-          <ul className="space-y-4 pb-2">
+          <Stagger className="space-y-4 pb-2">
             {comments.map((c) => (
-              <li key={c.id} className="flex gap-3">
+              <StaggerItem key={c.id} className="flex gap-3">
                 <button type="button" onClick={() => onProfile(c.user_id)} aria-label="View profile">
-                  <Avatar src={c.profile?.avatar_url} name={c.profile?.display_name || c.profile?.username} size="h-8 w-8" />
+                  <Avatar src={c.profile?.avatar_url} name={c.profile?.display_name || c.profile?.username} size="h-9 w-9" />
                 </button>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 rounded-3xl rounded-tl-lg bg-muted px-4 py-2.5">
                   <p className="text-sm">
-                    <span className="font-semibold">{c.profile?.username ?? "user"}</span>{" "}
+                    <span className="font-bold">{c.profile?.username ?? "user"}</span>{" "}
                     <span className="text-xs text-muted-foreground">{shortTimeAgo(c.created_at)}</span>
                   </p>
-                  <p className="break-words text-[15px] leading-snug">{c.content}</p>
+                  <p className="break-words text-[15px] leading-snug" data-selectable>
+                    {c.content}
+                  </p>
                 </div>
-              </li>
+              </StaggerItem>
             ))}
-          </ul>
+          </Stagger>
         )}
         <div ref={listEnd} />
       </div>
-      <form onSubmit={submit} className="mt-3 flex items-center gap-2 border-t border-border pt-3">
+      <form onSubmit={submit} className="sticky bottom-0 -mx-1 mt-3 flex items-center gap-2 bg-card px-1 pb-1 pt-2">
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
           maxLength={500}
           placeholder="Add a comment…"
           aria-label="Add a comment"
-          className="h-11 flex-1 rounded-full bg-muted/70 px-4 text-[16px] placeholder:text-muted-foreground/70 focus:outline-none"
+          className="h-12 flex-1 rounded-full border-2 border-transparent bg-muted px-5 text-[16px] placeholder:text-muted-foreground/70 focus:border-accent/70 focus:outline-none"
         />
-        <IconButton type="submit" label="Send" variant="accent" disabled={!text.trim() || sending}>
-          {sending ? <Spinner className="h-4 w-4 text-accent-foreground" /> : <Send className="h-4 w-4" />}
+        <IconButton type="submit" label="Send" variant="accent" size="md" disabled={!text.trim() || sending} className="h-12 w-12">
+          {sending ? <Spinner className="h-4 w-4 text-accent-foreground" /> : <Send className="h-5 w-5" />}
         </IconButton>
       </form>
     </Sheet>

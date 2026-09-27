@@ -1,15 +1,41 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import { VitePWA } from "vite-plugin-pwa";
+import fs from "node:fs";
 import path from "node:path";
 
+// GitHub Pages serves the app from /<repo>/, so the build takes its base path
+// from BASE_PATH (set in the deploy workflow). Locally it's just "/".
+const base = process.env.BASE_PATH ?? "/";
+
+const BACKGROUND = "#1c1c1f";
+
+/**
+ * GitHub Pages has no SPA rewrites. Serving index.html as 404.html lets deep
+ * links (/happs/map, auth email links…) boot the app, which then routes.
+ */
+function spaFallback(): Plugin {
+  return {
+    name: "spa-404-fallback",
+    apply: "build",
+    closeBundle() {
+      const out = path.resolve(__dirname, "dist");
+      const index = path.join(out, "index.html");
+      if (fs.existsSync(index)) {
+        fs.copyFileSync(index, path.join(out, "404.html"));
+        fs.writeFileSync(path.join(out, ".nojekyll"), "");
+      }
+    },
+  };
+}
+
 export default defineConfig({
+  base,
   server: { host: true, port: 8080 },
   plugins: [
     react(),
     VitePWA({
-      // Custom service worker so we can handle push notifications
-      // (the old generated worker had no push handler, so alerts never showed).
+      // Custom service worker so we can handle push notifications.
       strategies: "injectManifest",
       srcDir: "src",
       filename: "sw.ts",
@@ -17,27 +43,32 @@ export default defineConfig({
       injectRegister: "auto",
       injectManifest: {
         globPatterns: ["**/*.{js,css,html,svg,png,ico,ttf,woff2}"],
+        globIgnores: ["splash/**", "404.html"],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
       manifest: {
+        id: base,
         name: "The Happs",
         short_name: "Happs",
-        description: "Discover and share what's happening around you",
-        start_url: "/",
-        scope: "/",
+        description: "See what's happening around you, right now.",
+        start_url: base,
+        scope: base,
         display: "standalone",
+        display_override: ["standalone"],
         orientation: "portrait",
-        background_color: "#140e0a",
-        theme_color: "#140e0a",
+        background_color: BACKGROUND,
+        theme_color: BACKGROUND,
         lang: "en",
+        categories: ["social", "lifestyle", "navigation"],
         icons: [
-          { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
-          { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
-          { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          { src: "icon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "icon-512.png", sizes: "512x512", type: "image/png" },
+          { src: "icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
       devOptions: { enabled: false, type: "module" },
     }),
+    spaFallback(),
   ],
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },
@@ -49,6 +80,7 @@ export default defineConfig({
           mapbox: ["mapbox-gl"],
           supabase: ["@supabase/supabase-js"],
           react: ["react", "react-dom", "react-router-dom"],
+          motion: ["motion/react"],
         },
       },
     },

@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapPin, Pause, Play, RotateCcw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { TopBar } from "@/components/TopBar";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { Screen } from "@/components/motion";
+import { createHapp, createPost } from "@/lib/api";
 import { draftStore, useDraft } from "@/lib/draft";
 import { uploadMedia } from "@/lib/media";
 import { requestPush } from "@/lib/push";
@@ -60,39 +61,30 @@ export default function CameraPreview() {
       } else {
         setStatus("Creating your happ…");
         const iconUrl = await uploadMedia(user.id, target.happ.icon, "icon");
-        const { data: happ, error } = await supabase
-          .from("happs")
-          .insert({
+        happId = await createHapp(
+          {
             name: target.happ.name,
             description: target.happ.description || null,
             latitude: target.happ.latitude,
             longitude: target.happ.longitude,
             suburb: target.happ.suburb,
-            creator_id: user.id,
             icon_url: iconUrl,
-          })
-          .select("id")
-          .single();
-        if (error) throw error;
-        happId = happ.id;
+          },
+          user.id,
+        );
       }
 
       setStatus("Posting…");
-      // Joining the happ and bumping its activity now happen in a database trigger.
-      const { error: postError } = await supabase.from("posts").insert({
-        happ_id: happId,
-        user_id: user.id,
-        media_url: mediaUrl,
-        media_type: media.type,
-        caption: caption.trim() || null,
-      });
-      if (postError) throw postError;
+      await createPost(
+        { happ_id: happId, media_url: mediaUrl, media_type: media.type, caption: caption.trim() || null },
+        user.id,
+      );
 
       if (target.kind === "new") requestPush({ type: "happ", happ_id: happId });
 
       done.current = true;
       toast.success(target.kind === "new" ? "Your happ is live!" : "Posted!");
-      navigate("/map", { replace: true });
+      navigate(`/happ/${happId}`, { replace: true });
       draftStore.clear();
     } catch (err) {
       console.error("Post failed:", err);
@@ -104,7 +96,7 @@ export default function CameraPreview() {
   const busy = status !== null;
 
   return (
-    <div className="flex min-h-dvh-screen flex-col bg-background">
+    <Screen>
       <TopBar
         title={target.kind === "new" ? "New happ" : "New post"}
         onBack={retake}
@@ -115,8 +107,8 @@ export default function CameraPreview() {
         }
       />
 
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 px-4 pb-safe">
-        <div className="relative overflow-hidden rounded-3xl bg-black shadow-lg">
+      <main className="scroll-area mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col gap-4 px-4 pb-safe">
+        <div className="relative shrink-0 overflow-hidden rounded-4xl bg-black shadow-[0_16px_40px_-12px_rgb(0_0_0/0.6)]">
           {media.type === "image" ? (
             <img src={media.previewUrl} alt="Your capture" className="max-h-[55dvh] w-full object-contain" />
           ) : (
@@ -143,7 +135,7 @@ export default function CameraPreview() {
           )}
         </div>
 
-        <div className="flex items-center gap-2 rounded-2xl bg-muted/60 px-4 py-3 text-sm">
+        <div className="flex shrink-0 items-center gap-2 rounded-full bg-muted px-4 py-3 text-sm">
           {target.kind === "new" ? (
             <>
               <Sparkles className="h-4 w-4 shrink-0 text-accent" />
@@ -169,7 +161,7 @@ export default function CameraPreview() {
             maxLength={500}
             placeholder="Add a caption…"
             aria-label="Caption"
-            className="min-h-[5.5rem] flex-1 resize-none rounded-2xl bg-muted/60 px-4 py-3 text-[16px] placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-ring/40"
+            className="min-h-[5.5rem] flex-1 resize-none rounded-3xl border-2 border-transparent bg-muted px-4 py-3 text-[16px] placeholder:text-muted-foreground/70 focus:border-accent/70 focus:outline-none"
           />
         </div>
 
@@ -179,6 +171,6 @@ export default function CameraPreview() {
           </Button>
         </div>
       </main>
-    </div>
+    </Screen>
   );
 }

@@ -11,10 +11,7 @@ export const MAP_BOUNDS: [[number, number], [number, number]] = [
 ];
 export const MAP_CENTER: [number, number] = [151.2093, -33.8688];
 
-export const MAP_STYLES = {
-  light: "mapbox://styles/mapbox/light-v11",
-  dark: "mapbox://styles/mapbox/dark-v11",
-} as const;
+export const MAP_STYLE = "mapbox://styles/mapbox/dark-v11";
 
 export const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
 

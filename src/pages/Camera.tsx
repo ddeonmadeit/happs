@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "motion/react";
 import { CameraOff, ImageIcon, SwitchCamera, X } from "lucide-react";
 import { toast } from "sonner";
 import { useGoBack } from "@/components/TopBar";
 import { Button, IconButton } from "@/components/ui/Button";
+import { Screen, spring } from "@/components/motion";
 import { Spinner } from "@/components/ui/Spinner";
 import { draftStore, useDraft } from "@/lib/draft";
 import { MAX_VIDEO_SECONDS } from "@/lib/constants";
@@ -207,10 +209,10 @@ export default function Camera() {
   const label = target?.kind === "existing" ? target.happName : target?.kind === "new" ? target.happ.name : "";
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-black text-white">
+    <Screen className="bg-black text-white">
       <canvas ref={canvasRef} hidden />
 
-      <div className="relative flex-1 overflow-hidden rounded-b-[28px] bg-neutral-900">
+      <div className="relative flex-1 overflow-hidden rounded-b-[36px] bg-neutral-900">
         <video
           ref={videoRef}
           autoPlay
@@ -252,8 +254,8 @@ export default function Camera() {
             <X className="h-6 w-6" />
           </IconButton>
           {recording ? (
-            <span className="flex items-center gap-2 rounded-full bg-red-600 px-3.5 py-1.5 text-sm font-semibold tabular-nums">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
+            <span className="flex items-center gap-2 rounded-full bg-accent px-3.5 py-1.5 text-sm font-bold tabular-nums text-accent-foreground">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-accent-foreground" />
               0:{String(Math.floor(elapsed)).padStart(2, "0")} / 0:{MAX_VIDEO_SECONDS}
             </span>
           ) : (
@@ -277,11 +279,14 @@ export default function Camera() {
                 disabled={recording}
                 onClick={() => setMode(m)}
                 className={cn(
-                  "rounded-full px-5 py-2 transition-all duration-200 disabled:opacity-50",
-                  mode === m ? "bg-white text-black" : "text-white/70",
+                  "relative rounded-full px-5 py-2 transition-colors duration-200 disabled:opacity-50",
+                  mode === m ? "text-black" : "text-white/70",
                 )}
               >
-                {m}
+                {mode === m && (
+                  <motion.span layoutId="camera-mode" transition={spring.bouncy} className="absolute inset-0 rounded-full bg-white" />
+                )}
+                <span className="relative">{m}</span>
               </button>
             ))}
           </div>
@@ -298,12 +303,14 @@ export default function Camera() {
             <ImageIcon className="h-5 w-5" />
           </IconButton>
 
-          <button
+          <motion.button
             type="button"
             onClick={shutter}
             disabled={status !== "ready"}
             aria-label={mode === "photo" ? "Take photo" : recording ? "Stop recording" : "Start recording"}
-            className="relative flex h-20 w-20 items-center justify-center rounded-full transition-transform active:scale-95 disabled:opacity-40"
+            whileTap={{ scale: 0.85 }}
+            transition={spring.bouncy}
+            className="relative flex h-20 w-20 items-center justify-center rounded-full disabled:opacity-40"
           >
             <svg viewBox="0 0 80 80" className="absolute inset-0 -rotate-90">
               <circle cx="40" cy="40" r="36" fill="none" stroke="white" strokeOpacity={recording ? 0.3 : 1} strokeWidth="4" />
@@ -313,7 +320,7 @@ export default function Camera() {
                   cy="40"
                   r="36"
                   fill="none"
-                  stroke="#ef4444"
+                  stroke="hsl(25 100% 55%)"
                   strokeWidth="4"
                   strokeLinecap="round"
                   strokeDasharray={circumference}
@@ -326,11 +333,11 @@ export default function Camera() {
               className={cn(
                 "transition-all duration-300 ease-spring",
                 mode === "photo" && "h-[62px] w-[62px] rounded-full bg-white",
-                mode === "video" && !recording && "h-[58px] w-[58px] rounded-full bg-red-500",
-                mode === "video" && recording && "h-7 w-7 rounded-md bg-red-500",
+                mode === "video" && !recording && "h-[58px] w-[58px] rounded-full bg-accent",
+                mode === "video" && recording && "h-7 w-7 rounded-lg bg-accent",
               )}
             />
-          </button>
+          </motion.button>
 
           <IconButton
             label="Flip camera"
@@ -354,6 +361,6 @@ export default function Camera() {
           e.target.value = "";
         }}
       />
-    </div>
+    </Screen>
   );
 }

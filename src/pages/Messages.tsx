@@ -11,6 +11,8 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { Spinner } from "@/components/ui/Spinner";
+import { Pressable, Screen, Stagger, StaggerItem } from "@/components/motion";
+import { fetchConversations, getOrCreateConversation } from "@/lib/api";
 import { cn, errorMessage, shortTimeAgo, toSearchPattern } from "@/lib/utils";
 
 type UserResult = { user_id: string; username: string | null; display_name: string | null; avatar_url: string | null };
@@ -22,10 +24,14 @@ export default function Messages() {
 
   // One RPC for the whole inbox (the old list ran 3 queries per conversation).
   const load = useCallback(async () => {
-    const { data, error } = await supabase.rpc("get_conversations");
-    if (error) console.error("Error loading conversations:", error);
-    setConversations(data ?? []);
-  }, []);
+    if (!user) return;
+    try {
+      setConversations(await fetchConversations(user.id));
+    } catch (err) {
+      console.error("Error loading conversations:", err);
+      setConversations([]);
+    }
+  }, [user]);
 
   useEffect(() => {
     load();
@@ -35,7 +41,7 @@ export default function Messages() {
   useRealtime(user ? [{ table: "messages" }, { table: "conversations" }] : null, reload);
 
   return (
-    <div className="flex min-h-dvh-screen flex-col bg-background">
+    <Screen>
       <TopBar
         title="Messages"
         right={
@@ -45,7 +51,7 @@ export default function Messages() {
         }
       />
 
-      <main className="mx-auto w-full max-w-lg flex-1 pb-safe">
+      <main className="scroll-area mx-auto min-h-0 w-full max-w-lg flex-1 pb-safe">
         {conversations === null ? (
           <ul className="space-y-1 px-3 pt-2">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -60,17 +66,17 @@ export default function Messages() {
           </ul>
         ) : conversations.length === 0 ? (
           <div className="flex flex-col items-center gap-4 px-8 pt-24 text-center">
-            <span className="flex h-20 w-20 items-center justify-center rounded-full bg-muted text-muted-foreground">
-              <MessageCircle className="h-9 w-9" />
+            <span className="flex h-24 w-24 items-center justify-center rounded-full bg-accent/10 text-accent">
+              <MessageCircle className="h-11 w-11" />
             </span>
             <div>
-              <p className="font-semibold">No messages yet</p>
+              <p className="text-lg font-extrabold">No messages yet</p>
               <p className="mt-1 text-sm text-muted-foreground">Say hi to someone you met at a happ.</p>
             </div>
             <Button onClick={() => setComposeOpen(true)}>Start a conversation</Button>
           </div>
         ) : (
-          <ul className="px-2 pt-1">
+          <Stagger className="px-2 pt-1">
             {conversations.map((c) => {
               const name = c.other_display_name || c.other_username || "User";
               const unread = Number(c.unread_count) > 0;
@@ -78,15 +84,15 @@ export default function Messages() {
                 ? `${c.last_message_sender === user?.id ? "You: " : ""}${c.last_message}`
                 : "Say hi 👋";
               return (
-                <li key={c.id}>
+                <StaggerItem key={c.id}>
                   <Link
                     to={`/messages/${c.id}`}
-                    className="flex items-center gap-3 rounded-2xl p-3 transition-colors hover:bg-muted/60 active:bg-muted"
+                    className="flex items-center gap-3 rounded-3xl p-3 transition-colors active:bg-muted"
                   >
                     <Avatar src={c.other_avatar_url} name={name} size="h-12 w-12" />
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline justify-between gap-2">
-                        <span className={cn("truncate", unread ? "font-semibold" : "font-medium")}>{name}</span>
+                        <span className={cn("truncate text-[15px]", unread ? "font-extrabold" : "font-bold")}>{name}</span>
                         <span className={cn("shrink-0 text-xs", unread ? "font-semibold text-accent" : "text-muted-foreground")}>
                           {shortTimeAgo(c.last_message_at)}
                         </span>
@@ -103,15 +109,15 @@ export default function Messages() {
                       </span>
                     </span>
                   </Link>
-                </li>
+                </StaggerItem>
               );
             })}
-          </ul>
+          </Stagger>
         )}
       </main>
 
       <ComposeSheet open={composeOpen} onClose={() => setComposeOpen(false)} />
-    </div>
+    </Screen>
   );
 }
 
@@ -162,21 +168,23 @@ function ComposeSheet({ open, onClose }: { open: boolean; onClose: () => void })
   }, [query, user]);
 
   const openConversation = async (otherId: string) => {
+    if (!user) return;
     setOpening(otherId);
-    const { data, error } = await supabase.rpc("get_or_create_conversation", { p_other_user: otherId });
-    setOpening(null);
-    if (error || !data) {
-      toast.error(errorMessage(error, "Couldn't start the conversation"));
-      return;
+    try {
+      const id = await getOrCreateConversation(user.id, otherId);
+      onClose();
+      navigate(`/messages/${id}`);
+    } catch (err) {
+      toast.error(errorMessage(err, "Couldn't start the conversation"));
+    } finally {
+      setOpening(null);
     }
-    onClose();
-    navigate(`/messages/${data}`);
   };
 
   return (
     <Sheet open={open} onClose={onClose} title="New message">
       <div className="relative">
-        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
         <input
           ref={inputRef}
           type="search"
@@ -184,7 +192,7 @@ function ComposeSheet({ open, onClose }: { open: boolean; onClose: () => void })
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search people"
           aria-label="Search people"
-          className="h-12 w-full rounded-2xl bg-muted/70 pl-10 pr-4 text-[16px] placeholder:text-muted-foreground/70 focus:outline-none"
+          className="h-[52px] w-full rounded-full border-2 border-transparent bg-muted pl-11 pr-4 text-[16px] placeholder:text-muted-foreground/70 focus:border-accent/70 focus:outline-none"
         />
       </div>
       <div className="mt-3 min-h-[12rem]">
@@ -200,11 +208,11 @@ function ComposeSheet({ open, onClose }: { open: boolean; onClose: () => void })
           <ul className="-mx-2">
             {results.map((r) => (
               <li key={r.user_id}>
-                <button
-                  type="button"
+                <Pressable
+                  pressScale={0.97}
                   onClick={() => openConversation(r.user_id)}
                   disabled={opening !== null}
-                  className="flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition-colors hover:bg-muted/70"
+                  className="flex w-full items-center gap-3 rounded-3xl p-2.5 text-left"
                 >
                   <Avatar src={r.avatar_url} name={r.display_name || r.username} size="h-11 w-11" />
                   <span className="min-w-0 flex-1">
@@ -212,7 +220,7 @@ function ComposeSheet({ open, onClose }: { open: boolean; onClose: () => void })
                     {r.username && <span className="block truncate text-sm text-muted-foreground">@{r.username}</span>}
                   </span>
                   {opening === r.user_id && <Spinner className="h-4 w-4" />}
-                </button>
+                </Pressable>
               </li>
             ))}
           </ul>

@@ -12,7 +12,6 @@ type TopBarProps = {
   fallback?: string;
   onBack?: () => void;
   className?: string;
-  transparent?: boolean;
 };
 
 export function useGoBack(fallback = "/map") {
@@ -25,22 +24,16 @@ export function useGoBack(fallback = "/map") {
   };
 }
 
-export function TopBar({ title, subtitle, right, fallback = "/map", onBack, className, transparent }: TopBarProps) {
+export function TopBar({ title, subtitle, right, fallback = "/map", onBack, className }: TopBarProps) {
   const goBack = useGoBack(fallback);
   return (
-    <header
-      className={cn(
-        "sticky top-0 z-30 flex items-center gap-2 px-3 pb-2 pt-safe",
-        !transparent && "bg-background/85 backdrop-blur-xl",
-        className,
-      )}
-    >
-      <IconButton label="Back" variant="ghost" onClick={onBack ?? goBack}>
-        <ChevronLeft className="h-6 w-6" />
+    <header className={cn("z-30 flex shrink-0 items-center gap-2 px-3 pb-2 pt-safe", className)}>
+      <IconButton label="Back" variant="muted" onClick={onBack ?? goBack}>
+        <ChevronLeft className="h-6 w-6" strokeWidth={2.5} />
       </IconButton>
       <div className="min-w-0 flex-1 text-center">
-        {title && <h1 className="truncate text-[17px] font-semibold tracking-tight">{title}</h1>}
-        {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}
+        {title && <h1 className="truncate text-[17px] font-extrabold tracking-tight">{title}</h1>}
+        {subtitle && <p className="truncate text-xs font-medium text-muted-foreground">{subtitle}</p>}
       </div>
       <div className="flex min-w-11 items-center justify-end gap-1">{right}</div>
     </header>

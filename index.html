@@ -1,51 +1,48 @@
 <!doctype html>
-<html lang="en" class="theme-warm dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- App-like: no pinch/double-tap zoom, content extends under the notch, keyboard resizes the view. -->
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"
     />
     <title>The Happs</title>
-    <meta name="description" content="Discover and share what's happening around you in real time." />
-    <meta name="author" content="The Happs" />
+    <meta name="description" content="See what's happening around you, right now." />
+    <meta name="theme-color" content="#1c1c1f" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="format-detection" content="telephone=no" />
 
-    <meta name="theme-color" content="#140e0a" />
+    <!-- Home-screen app (iOS) -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="The Happs" />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <meta name="apple-mobile-web-app-title" content="Happs" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+
+    <!-- Launch screens, so opening from the home screen shows the brand instead of a white flash. -->
+    <link rel="apple-touch-startup-image" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3)" href="/splash/1320x2868.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3)" href="/splash/1206x2622.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" href="/splash/1290x2796.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" href="/splash/1179x2556.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)" href="/splash/1284x2778.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" href="/splash/1170x2532.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" href="/splash/1125x2436.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)" href="/splash/1242x2688.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)" href="/splash/828x1792.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)" href="/splash/1242x2208.png" />
+    <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" href="/splash/750x1334.png" />
 
     <link rel="preload" href="/fonts/Brunson.ttf" as="font" type="font/ttf" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
     <meta property="og:type" content="website" />
     <meta property="og:title" content="The Happs" />
-    <meta property="og:description" content="Discover and share what's happening around you in real time." />
-    <meta property="og:image" content="/icon-512.png" />
+    <meta property="og:description" content="See what's happening around you, right now." />
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="The Happs" />
-    <meta name="twitter:description" content="Discover and share what's happening around you in real time." />
-
-    <script>
-      // Apply the saved theme before first paint so there is no flash of the wrong colours.
-      (function () {
-        try {
-          var scheme = localStorage.getItem("happ-color-scheme") || "warm";
-          var mode = localStorage.getItem("happ-theme-mode") || "dark";
-          var el = document.documentElement;
-          el.className = "theme-" + scheme + (mode === "dark" ? " dark" : "");
-        } catch (e) {}
-      })();
-    </script>
   </head>
   <body>
     <div id="root"></div>

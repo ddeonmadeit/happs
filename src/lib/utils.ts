@@ -49,3 +49,8 @@ export function errorMessage(error: unknown, fallback = "Something went wrong") 
   }
   return fallback;
 }
+
+/** Absolute URL inside the app, respecting the GitHub Pages base path. */
+export function appUrl(path = "") {
+  return `${window.location.origin}${import.meta.env.BASE_URL}${path.replace(/^\//, "")}`;
+}

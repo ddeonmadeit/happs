@@ -1,20 +1,22 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, BellOff } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { Bell, BellOff, X } from "lucide-react";
 import { toast } from "sonner";
 import { usePush } from "@/contexts/PushContext";
 import { Button } from "@/components/ui/Button";
 import { Switch } from "@/components/ui/Switch";
 import { Spinner } from "@/components/ui/Spinner";
+import { spring } from "@/components/motion";
 
 /** Settings row for turning push notifications on/off. */
 export function PushToggle() {
   const { isSupported, needsInstall, isSubscribed, permission, isLoading, subscribe, unsubscribe } = usePush();
 
-  let description = isSubscribed ? "Messages and new happs nearby" : "Get alerts for messages and nearby happs";
-  if (needsInstall) description = "Add The Happs to your Home Screen to enable";
-  else if (!isSupported) description = "Not available in this browser";
-  else if (permission === "denied") description = "Blocked — allow notifications in your browser settings";
+  let description = "Messages and new happs nearby";
+  if (needsInstall) description = "Add The Happs to your Home Screen first";
+  else if (!isSupported) description = "Not available here yet";
+  else if (permission === "denied") description = "Blocked in your settings";
 
   const disabled = !isSupported || permission === "denied";
 
@@ -25,17 +27,17 @@ export function PushToggle() {
 
   return (
     <div className="flex items-center gap-3">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
         {disabled ? <BellOff className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[15px] font-medium">Notifications</p>
+        <p className="text-[15px] font-bold">Notifications</p>
         <p className="text-sm text-muted-foreground">
           {description}
           {needsInstall && (
             <>
               {" · "}
-              <Link to="/install" className="font-medium text-accent">
+              <Link to="/install" className="font-semibold text-accent">
                 How?
               </Link>
             </>
@@ -53,7 +55,7 @@ export function PushToggle() {
 
 const DISMISS_KEY = "push-banner-dismissed";
 
-/** One-time prompt on the map. */
+/** One-time nudge on the map. */
 export function PushBanner() {
   const { isSupported, isSubscribed, permission, isLoading, subscribe } = usePush();
   const [dismissed, setDismissed] = useState(() => {
@@ -64,7 +66,7 @@ export function PushBanner() {
     }
   });
 
-  if (!isSupported || isSubscribed || permission === "denied" || dismissed) return null;
+  const show = isSupported && !isSubscribed && permission !== "denied" && !dismissed;
 
   const dismiss = () => {
     try {
@@ -76,26 +78,33 @@ export function PushBanner() {
   };
 
   return (
-    <div className="glass pointer-events-auto flex animate-fade-up items-center gap-3 rounded-3xl p-3 pl-4">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
-        <Bell className="h-[18px] w-[18px]" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold leading-tight">Stay in the loop</p>
-        <p className="text-xs text-muted-foreground">Get notified about nearby happs</p>
-      </div>
-      <Button size="sm" variant="ghost" onClick={dismiss} className="px-3 text-muted-foreground">
-        Later
-      </Button>
-      <Button
-        size="sm"
-        loading={isLoading}
-        onClick={async () => {
-          if (await subscribe()) toast.success("Notifications on");
-        }}
-      >
-        Enable
-      </Button>
-    </div>
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          initial={{ y: 40, opacity: 0, scale: 0.9 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          exit={{ y: 20, opacity: 0, scale: 0.9 }}
+          transition={spring.bouncy}
+          className="glass flex items-center gap-3 rounded-4xl p-2.5 pl-3"
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
+            <Bell className="h-5 w-5" />
+          </span>
+          <p className="min-w-0 flex-1 text-sm font-semibold leading-tight">Get pinged about happs near you</p>
+          <Button
+            size="sm"
+            loading={isLoading}
+            onClick={async () => {
+              if (await subscribe()) toast.success("Notifications on");
+            }}
+          >
+            Turn on
+          </Button>
+          <button type="button" aria-label="Dismiss" onClick={dismiss} className="p-1.5 text-muted-foreground">
+            <X className="h-4 w-4" />
+          </button>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

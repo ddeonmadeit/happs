@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchUnreadCount } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDebounced, useRealtime } from "./useRealtime";
 
@@ -10,8 +10,11 @@ export function useUnreadCount() {
 
   const load = useCallback(async () => {
     if (!user) return setCount(0);
-    const { data, error } = await supabase.rpc("get_unread_count");
-    if (!error) setCount(Number(data ?? 0));
+    try {
+      setCount(await fetchUnreadCount(user.id));
+    } catch {
+      /* keep the last value */
+    }
   }, [user]);
 
   useEffect(() => {

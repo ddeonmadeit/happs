@@ -33,6 +33,9 @@ registerRoute(
 // ---- Push notifications (missing from the old service worker) ----
 type PushData = { title?: string; body?: string; url?: string; tag?: string; icon?: string };
 
+/** App paths ("/messages/1") resolved inside our scope, e.g. /happs/messages/1 on GitHub Pages. */
+const inScope = (path: string) => new URL(path.replace(/^\//, ""), self.registration.scope).href;
+
 self.addEventListener("push", (event) => {
   let data: PushData = {};
   try {
@@ -43,8 +46,8 @@ self.addEventListener("push", (event) => {
 
   const options: NotificationOptions & { renotify?: boolean } = {
     body: data.body ?? "",
-    icon: data.icon || "/icon-192.png",
-    badge: "/icon-192.png",
+    icon: data.icon || inScope("icon-192.png"),
+    badge: inScope("icon-192.png"),
     tag: data.tag,
     renotify: Boolean(data.tag),
     data: { url: data.url ?? "/" },
@@ -55,7 +58,7 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = new URL((event.notification.data as { url?: string })?.url ?? "/", self.location.origin).href;
+  const target = inScope((event.notification.data as { url?: string })?.url ?? "/");
 
   event.waitUntil(
     (async () => {

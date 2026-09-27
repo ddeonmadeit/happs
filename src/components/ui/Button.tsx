@@ -1,39 +1,43 @@
-import { forwardRef, type ButtonHTMLAttributes } from "react";
+import { forwardRef, type ComponentProps, type ReactNode } from "react";
+import { motion } from "motion/react";
 import { Loader2 } from "lucide-react";
+import { spring } from "@/components/motion";
 import { cn } from "@/lib/utils";
 
-type Variant = "primary" | "accent" | "secondary" | "ghost" | "outline" | "destructive";
+type Variant = "accent" | "secondary" | "ghost" | "destructive";
 type Size = "sm" | "md" | "lg";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-primary text-primary-foreground hover:bg-primary/90",
-  accent: "bg-accent text-accent-foreground hover:bg-accent/90 shadow-sm shadow-accent/20",
-  secondary: "bg-muted text-foreground hover:bg-muted/80",
-  ghost: "bg-transparent text-foreground hover:bg-muted",
-  outline: "border border-border bg-transparent text-foreground hover:bg-muted/60",
-  destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+  accent: "bg-accent text-accent-foreground shadow-[0_6px_20px_-6px_hsl(var(--accent)/0.6)]",
+  secondary: "bg-muted text-foreground",
+  ghost: "bg-transparent text-foreground",
+  destructive: "bg-destructive text-destructive-foreground shadow-[0_6px_20px_-6px_hsl(var(--destructive)/0.55)]",
 };
 
 const sizes: Record<Size, string> = {
-  sm: "h-9 px-4 text-sm rounded-xl",
-  md: "h-12 px-5 text-[15px] rounded-2xl",
-  lg: "h-14 px-6 text-base rounded-2xl",
+  sm: "h-10 px-4 text-sm",
+  md: "h-12 px-6 text-[15px]",
+  lg: "h-14 px-7 text-base",
 };
 
-export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+export type ButtonProps = Omit<ComponentProps<typeof motion.button>, "children"> & {
   variant?: Variant;
   size?: Size;
   loading?: boolean;
+  children?: ReactNode;
 };
 
+/** Pill button with a springy press. */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "accent", size = "md", loading, disabled, children, type = "button", ...props }, ref) => (
-    <button
+    <motion.button
       ref={ref}
       type={type}
       disabled={disabled || loading}
+      whileTap={{ scale: 0.95 }}
+      transition={spring.bouncy}
       className={cn(
-        "inline-flex select-none items-center justify-center gap-2 font-semibold transition-all duration-200 ease-smooth active:scale-[0.97] disabled:pointer-events-none disabled:opacity-45",
+        "inline-flex select-none items-center justify-center gap-2 rounded-full font-bold tracking-tight transition-[opacity,background-color] duration-200 disabled:pointer-events-none disabled:opacity-40",
         variants[variant],
         sizes[size],
         className,
@@ -41,38 +45,42 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       {...props}
     >
       {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : children}
-    </button>
+    </motion.button>
   ),
 );
 Button.displayName = "Button";
 
-type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+type IconButtonProps = Omit<ComponentProps<typeof motion.button>, "children"> & {
   label: string;
   variant?: "glass" | "muted" | "ghost" | "accent";
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
+  children?: ReactNode;
 };
 
 /** Round icon-only button. `label` is required for screen readers. */
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
   ({ className, label, variant = "muted", size = "md", type = "button", children, ...props }, ref) => (
-    <button
+    <motion.button
       ref={ref}
       type={type}
       aria-label={label}
       title={label}
+      whileTap={{ scale: 0.84 }}
+      transition={spring.bouncy}
       className={cn(
-        "relative inline-flex shrink-0 items-center justify-center rounded-full text-foreground transition-all duration-200 ease-smooth active:scale-90 disabled:opacity-40",
-        size === "md" ? "h-11 w-11" : "h-9 w-9",
+        "relative inline-flex shrink-0 select-none items-center justify-center rounded-full text-foreground disabled:opacity-40",
+        size === "sm" && "h-9 w-9",
+        size === "md" && "h-11 w-11",
+        size === "lg" && "h-14 w-14",
         variant === "glass" && "glass",
-        variant === "muted" && "bg-muted/70 hover:bg-muted",
-        variant === "ghost" && "hover:bg-muted",
-        variant === "accent" && "bg-accent text-accent-foreground hover:bg-accent/90",
+        variant === "muted" && "bg-muted",
+        variant === "accent" && "bg-accent text-accent-foreground shadow-[0_6px_20px_-6px_hsl(var(--accent)/0.6)]",
         className,
       )}
       {...props}
     >
       {children}
-    </button>
+    </motion.button>
   ),
 );
 IconButton.displayName = "IconButton";

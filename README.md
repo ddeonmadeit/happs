@@ -5,25 +5,69 @@ map of Sydney. Anyone nearby can join one, post photos and short videos to its
 story, and vote it a **Dead Happ (DH)** once it's winding down. The app also has
 profiles, follows, likes, comments, direct messages and push notifications.
 
-This repo is a full rebuild of the original Lovable app
-(`thehapps.lovable.app`): the same features, screens and data model, with a
-new Supabase backend, a long list of bug fixes, and a simpler, cleaner UI.
+**Live:** https://ddeonmadeit.github.io/happs/
 
-**Stack:** React 18 · TypeScript · Vite · Tailwind CSS · Supabase (Postgres,
-Auth, Storage, Realtime, Edge Functions) · Mapbox GL · installable PWA with web
-push.
+This repo is a full rebuild of the original Lovable app: the same features and
+data, with a simple charcoal-and-orange design, Waze-style springy
+animations, and a proper full-screen home-screen app.
+
+**Stack:** React 18 · TypeScript · Vite · Tailwind CSS · Motion (spring
+animations) · Supabase · Mapbox GL · installable PWA · GitHub Pages.
 
 ---
 
-## Quick start
+## Use it like an app
+
+Open the live link on your phone, then:
+
+- **iPhone (Safari):** tap Share → **Add to Home Screen** → Add.
+- **Android (Chrome):** menu ⋮ → **Install app**.
+
+Launched from the home screen, it opens full-screen with a branded launch
+screen: no browser bars, no page bounce, no pinch-zoom. The map stays loaded
+in the background, so moving between screens is instant.
+
+## Deployment (GitHub Pages)
+
+Every push to the default branch builds and publishes the site
+(`.github/workflows/deploy.yml`).
+
+**One-time setup:** repo **Settings → Pages → Build and deployment → Source:
+GitHub Actions**. Then re-run the "Deploy to GitHub Pages" workflow, or push
+any commit.
+
+The build uses `BASE_PATH=/<repo>/` so everything works under
+`https://<user>.github.io/<repo>/`, and it writes a `404.html` copy of the app
+so deep links and email links open correctly.
+
+### Which backend the live site uses
+
+By default the site talks to **the original The Happs Supabase project**, so
+existing accounts and data keep working. That project has the same tables but
+none of this repo's server-side functions. `src/lib/api.ts` detects this and
+falls back to the queries the original app made. On that backend, push
+notifications stay hidden because it never had a subscriptions table.
+
+To move to your own project with the full backend below, add these under
+**Settings → Secrets and variables → Actions → Variables** and re-run the
+workflow:
+
+| Variable                         | Value                               |
+| -------------------------------- | ----------------------------------- |
+| `VITE_SUPABASE_URL`              | `https://<ref>.supabase.co`         |
+| `VITE_SUPABASE_PUBLISHABLE_KEY`  | your project's publishable/anon key |
+| `VITE_MAPBOX_TOKEN` *(optional)* | a public Mapbox token               |
+
+The app switches to the new functions automatically. Add
+`https://<user>.github.io/<repo>/auth` to the project's Auth redirect URLs.
+
+## Local development
 
 ```bash
 npm install
-cp .env.example .env        # fill in your Supabase URL + publishable key
+cp .env.example .env        # Supabase URL + publishable key
 npm run dev                 # http://localhost:8080
 ```
-
-Without a `.env`, the app shows a setup screen instead of crashing.
 
 | Script              | What it does                          |
 | ------------------- | ------------------------------------- |
@@ -121,19 +165,31 @@ importing:
 Uploaded media URLs still point at the old storage bucket. Copy the files over
 if you're retiring that project.
 
-## Deploying the frontend
-
-It's a static single-page app. Build with `npm run build` and host `dist/`
-anywhere with an SPA fallback. `vercel.json` (Vercel) and `public/_redirects`
-(Netlify, Cloudflare Pages) are included. Set the same `VITE_*` variables in
-your host's environment settings.
-
 The map is limited to Greater Sydney, as in the original. Change `MAP_BOUNDS`
 and `MAP_CENTER` in `src/lib/constants.ts` to open it up.
 
 ---
 
 ## What changed from the original
+
+### Design
+
+- **One theme:** charcoal surfaces (`#1c1c1f`) with orange (`#ff7a1a`)
+  highlights. Red is used only for Dead Happs.
+- **Waze-style map screen:** your avatar top-left and messages top-right; a
+  big orange **+** to start a happ; a search pill at the bottom. A "You're
+  here" card with **Post** and **DH** springs up only when you're actually at a
+  happ.
+- **Happs open as a card over the map** (`/happ/:id`), with the story ring,
+  who's there, and Join & post. Search opens as a sheet listing what's on
+  nearest to you.
+- **Springs everywhere:** buttons squish when pressed, sheets spring up and
+  swipe down to close, markers drop in with a bounce, screens slide over the
+  map and away again, stories swipe left/right and down to close, tabs slide,
+  and chat bubbles pop in.
+- **Simpler:** signed-in users open straight onto the map; the colour-scheme
+  picker and light mode are gone; settings are just notifications, install and
+  sign out.
 
 ### Bugs fixed
 
@@ -208,34 +264,18 @@ and `MAP_CENTER` in `src/lib/constants.ts` to open it up.
 - The notch area was padded twice (on `<body>` and on every page).
 - Searching for text with a comma or bracket broke the search query.
 - There were two separate toast systems. Now there's one.
-
-### Visual cleanup
-
-- One consistent design language: rounded surfaces, a single accent colour per
-  theme, and consistent 44 px touch targets and spacing on every screen.
-- The heavy embossed drop-shadows are gone. The Brunson display font is kept for
-  the wordmark and "DH" moments.
-- Map controls sit in a single floating dock (Post · Create · DH), with a
-  "You're at …" chip when you're inside a happ and a recentre button.
-- Stories are a proper full-screen viewer: tap left or right to move, progress
-  bars, and comments in a sheet.
-- Bottom sheets and dialogs animate smoothly, the inbox and map show
-  placeholders while loading, and animations respect "reduce motion".
-- All three colour schemes (Earth, Warm, Jaded) in light and dark still work.
-  The saved theme is applied before first paint, so there's no flash of the
-  wrong colours.
-- Code-split routes. The first screen loads about 4× less JavaScript than
-  before, and the map loads only when you open it.
+- Push could never work on the original backend: it has no
+  `push_subscriptions` table.
 
 ## Project structure
 
 ```
 src/
-  pages/            one file per screen (Map, CreateHapp, HappDetail, Story, Profile, Camera, Chat…)
-  components/       shared UI (TopBar, MapHeader, HappMap, sheets) and ui/ primitives
-  contexts/         Auth, Theme, Push providers
+  pages/            one file per screen (Welcome, Map, CreateHapp, Story, Profile, Camera, Chat…)
+  components/       shared UI (HappMap, map/ sheets, motion springs) and ui/ primitives
+  contexts/         Auth and Push providers
   hooks/            geolocation, realtime, unread count, install prompt
-  lib/              draft store, media upload, Mapbox helpers, constants
+  lib/              api (backend access + legacy fallback), draft store, media, Mapbox
   integrations/supabase/   typed client + database types
   sw.ts             service worker (precache + push)
 supabase/

@@ -1,21 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Camera, LocateFixed } from "lucide-react";
+import { matchPath, useLocation, useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "motion/react";
+import { Camera, LocateFixed, MessageCircle, Search } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePush } from "@/contexts/PushContext";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useDebounced, useRealtime } from "@/hooks/useRealtime";
-import { HappMap, type HappMapHandle, type MapHapp } from "@/components/HappMap";
-import { MapHeader } from "@/components/MapHeader";
+import { useUnreadCount } from "@/hooks/useUnreadCount";
+import { HappMap, type HappMapHandle } from "@/components/HappMap";
+import { HappSheet } from "@/components/map/HappSheet";
+import { SearchSheet } from "@/components/map/SearchSheet";
 import { PushBanner } from "@/components/PushControls";
 import { HappsMark } from "@/components/Logo";
+import { Pressable, spring } from "@/components/motion";
 import { Sheet } from "@/components/ui/Sheet";
+import { Avatar } from "@/components/ui/Avatar";
 import { Button, IconButton } from "@/components/ui/Button";
+import { useGoBack } from "@/components/TopBar";
+import { fetchMapHapps, fetchMyDeadHappVote, NotParticipantError, toggleDeadHapp, type MapHapp } from "@/lib/api";
 import { draftStore } from "@/lib/draft";
 import { NEARBY_RADIUS_M } from "@/lib/constants";
 import { cn, distanceMeters, errorMessage } from "@/lib/utils";
+import type { HappRow } from "@/integrations/supabase/types";
 
 function nearestHapp(happs: MapHapp[], lat: number, lng: number) {
   let best: MapHapp | null = null;
@@ -30,41 +37,37 @@ function nearestHapp(happs: MapHapp[], lat: number, lng: number) {
   return best;
 }
 
-export default function MapPage() {
+/**
+ * The home of the app. Stays mounted while you move around; other screens
+ * slide over it. `/happ/:id` opens that happ's card on top of the map.
+ */
+export default function MapPage({ active }: { active: boolean }) {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { pathname } = useLocation();
+  const { user, profile } = useAuth();
   const { updateLocation } = usePush();
+  const unread = useUnreadCount();
   const { location, refresh } = useGeolocation({ watch: true });
   const mapRef = useRef<HappMapHandle>(null);
+  const closeHapp = useGoBack("/map");
+
+  const selectedId = active ? (matchPath("/happ/:id", pathname)?.params.id ?? null) : null;
 
   const [happs, setHapps] = useState<MapHapp[]>([]);
   const [dhPressed, setDhPressed] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [voting, setVoting] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
-  // One RPC instead of one query per happ (the old map made N+1 requests and
-  // redid them all on every change anywhere).
   const loadHapps = useCallback(async () => {
-    const { data, error } = await supabase.rpc("get_map_happs");
-    if (error) {
-      console.error("Error fetching happs:", error);
-      return;
+    try {
+      setHapps(await fetchMapHapps());
+    } catch (err) {
+      console.error("Error fetching happs:", err);
     }
-    setHapps(
-      (data ?? []).map((h) => ({
-        id: h.id,
-        name: h.name,
-        latitude: h.latitude,
-        longitude: h.longitude,
-        postCount: Number(h.post_count),
-        isActive: h.is_active,
-        iconUrl: h.icon_url,
-      })),
-    );
   }, []);
 
   useEffect(() => {
-    loadHapps();
     // Happs expire after 2 h of inactivity, so refresh now and then too.
     const interval = setInterval(loadHapps, 60_000);
     return () => clearInterval(interval);
@@ -72,6 +75,11 @@ export default function MapPage() {
 
   const reload = useDebounced(loadHapps, 500);
   useRealtime([{ table: "happs" }, { table: "posts", event: "INSERT" }], reload);
+
+  // Load on first show, and again whenever you come back (e.g. after posting).
+  useEffect(() => {
+    if (active) loadHapps();
+  }, [active, loadHapps]);
 
   const nearby = useMemo(
     () => (location ? nearestHapp(happs, location.latitude, location.longitude) : null),
@@ -82,166 +90,225 @@ export default function MapPage() {
     if (location) updateLocation(location.latitude, location.longitude);
   }, [location, updateLocation]);
 
-  // Show whether you've already voted this happ dead (the old red ring
-  // reset on every reload).
   useEffect(() => {
     if (!nearby || !user) {
       setDhPressed(false);
       return;
     }
     let cancelled = false;
-    supabase
-      .from("happ_participants")
-      .select("dh_pressed")
-      .eq("happ_id", nearby.id)
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data }) => !cancelled && setDhPressed(Boolean(data?.dh_pressed)));
+    fetchMyDeadHappVote(nearby.id, user.id).then((v) => {
+      if (!cancelled) setDhPressed(v);
+    });
     return () => {
       cancelled = true;
     };
   }, [nearby, user]);
 
-  const findNearby = async () => {
-    const fresh = await refresh();
-    if (!fresh) {
-      toast.error("We couldn’t get your location");
-      return null;
-    }
-    return nearestHapp(happs, fresh.latitude, fresh.longitude);
-  };
+  // Glide to a happ when its card opens, keeping it above the sheet.
+  const onHappLoaded = useCallback((h: HappRow) => {
+    mapRef.current?.flyTo(h, { offsetY: window.innerHeight * 0.22 });
+  }, []);
 
-  const startPost = async () => {
-    const happ = nearby ?? (await findNearby());
-    if (!happ) {
-      // The old app opened the camera anyway, then failed with "No happ to post to".
-      toast("No happ within 50 m", {
-        description: "Start one here and be the first to post.",
-        action: { label: "Create", onClick: () => navigate("/create-happ") },
-      });
-      return;
-    }
-    draftStore.setTarget({ kind: "existing", happId: happ.id, happName: happ.name });
+  const startPost = () => {
+    if (!nearby) return;
+    draftStore.setTarget({ kind: "existing", happId: nearby.id, happName: nearby.name });
     navigate("/camera");
   };
 
-  const openDeadHapp = async () => {
-    const happ = nearby ?? (await findNearby());
-    if (!happ) {
-      toast.error("You need to be within 50 m of a happ to use DH");
-      return;
+  const toggleVote = async () => {
+    if (!nearby || !user) return;
+    setVoting(true);
+    try {
+      const result = await toggleDeadHapp(nearby.id, user.id);
+      setDhPressed(result.dh_pressed);
+      toast.success(result.dh_pressed ? "Marked as a Dead Happ" : "Dead Happ vote removed");
+      loadHapps();
+    } catch (err) {
+      toast.error(err instanceof NotParticipantError ? "Post to this happ first to vote" : errorMessage(err));
+    } finally {
+      setVoting(false);
+      setConfirmOpen(false);
     }
-    setConfirmOpen(true);
   };
 
-  const toggleDeadHapp = async () => {
-    const happ = nearby ?? (await findNearby());
-    if (!happ) return setConfirmOpen(false);
-    setVoting(true);
-    const { data, error } = await supabase.rpc("toggle_dead_happ", { p_happ_id: happ.id });
-    setVoting(false);
-    setConfirmOpen(false);
-    if (error) {
-      toast.error(error.message.includes("participant") ? "Post to this happ first to vote" : errorMessage(error));
-      return;
-    }
-    const result = data as { dh_pressed: boolean; is_active: boolean };
-    setDhPressed(result.dh_pressed);
-    toast.success(result.dh_pressed ? "Marked as a Dead Happ" : "Dead Happ vote removed");
-    loadHapps();
+  const recenter = async () => {
+    const at = location ?? (await refresh());
+    if (!at) toast.error("We couldn’t get your location");
+    else mapRef.current?.flyTo(at, { zoom: 15.5 });
   };
 
   return (
-    <div className="relative h-dvh-screen overflow-hidden bg-background">
+    <div className="absolute inset-0 overflow-hidden bg-background" aria-hidden={!active}>
       <HappMap
         ref={mapRef}
         happs={happs}
+        selectedId={selectedId}
         userLocation={location}
-        onHappClick={(id) => navigate(`/happ/${id}`)}
+        onHappClick={(id) => navigate(`/happ/${id}`, { replace: Boolean(selectedId) })}
         className="absolute inset-0"
       />
 
-      <MapHeader profileAlert={dhPressed} />
+      {/* Top: you, and your messages */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between px-4 pt-safe">
+        <motion.button
+          type="button"
+          aria-label="Your profile"
+          onClick={() => navigate("/profile")}
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          whileTap={{ scale: 0.85 }}
+          transition={{ ...spring.bouncy, delay: 0.1 }}
+          className={cn("glass pointer-events-auto rounded-full p-1", dhPressed && "ring-[3px] ring-dead")}
+        >
+          <Avatar src={profile?.avatar_url} name={profile?.display_name || profile?.username} size="h-11 w-11" />
+        </motion.button>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-safe z-20 flex flex-col items-center gap-3 px-3">
-        <div className="flex w-full max-w-md flex-col gap-2">
-          <PushBanner />
-          <div className="flex items-end justify-between">
-            {nearby ? (
-              <button
-                type="button"
-                onClick={() => navigate(`/happ/${nearby.id}`)}
-                className="glass pointer-events-auto flex max-w-[75%] animate-fade-up items-center gap-2 rounded-full py-1.5 pl-2 pr-4 text-sm"
-              >
-                <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", nearby.isActive ? "bg-live" : "bg-dead")} />
-                <span className="truncate">
-                  You’re at <span className="font-semibold">{nearby.name}</span>
-                </span>
-              </button>
-            ) : (
-              <span />
-            )}
-            <IconButton label="Show my location" variant="glass" className="pointer-events-auto" onClick={async () => {
-                const at = location ?? (await refresh());
-                if (!at) toast.error("We couldn’t get your location");
-                else mapRef.current?.locate(at);
-              }}>
-              <LocateFixed className="h-5 w-5" />
-            </IconButton>
-          </div>
-        </div>
-
-        <nav className="glass pointer-events-auto flex w-full max-w-md items-center justify-between gap-3 rounded-[28px] p-2">
-          <button
-            type="button"
-            onClick={startPost}
-            className="pressable flex h-16 flex-1 flex-col items-center justify-center gap-0.5 rounded-[22px] bg-live/15 text-live"
+        <motion.div
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ ...spring.bouncy, delay: 0.16 }}
+          className="pointer-events-auto"
+        >
+          <IconButton
+            label={unread ? `Messages, ${unread} unread` : "Messages"}
+            variant="glass"
+            size="lg"
+            onClick={() => navigate("/messages")}
           >
-            <Camera className="h-6 w-6" strokeWidth={2.2} />
-            <span className="text-[11px] font-semibold uppercase tracking-wide">Post</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigate("/create-happ")}
-            aria-label="Create a happ"
-            className="pressable -my-5 flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-xl shadow-accent/30 ring-4 ring-background/80"
-          >
-            <HappsMark className="h-10 w-10" />
-          </button>
-
-          <button
-            type="button"
-            onClick={openDeadHapp}
-            aria-label="Dead Happ"
-            className={cn(
-              "pressable flex h-16 flex-1 flex-col items-center justify-center gap-0.5 rounded-[22px] text-dead",
-              dhPressed ? "bg-dead text-destructive-foreground" : "bg-dead/15",
-            )}
-          >
-            <span className="font-brunson text-[28px] leading-none">DH</span>
-            <span className="text-[11px] font-semibold uppercase tracking-wide">{dhPressed ? "Voted" : "Dead"}</span>
-          </button>
-        </nav>
+            <MessageCircle className="h-6 w-6" strokeWidth={2.2} />
+            <AnimatePresence>
+              {unread > 0 && (
+                <motion.span
+                  key={unread}
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0 }}
+                  transition={spring.bouncy}
+                  className="absolute -right-0.5 -top-0.5 flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-accent px-1.5 text-xs font-extrabold text-accent-foreground ring-[3px] ring-background"
+                >
+                  {unread > 9 ? "9+" : unread}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </IconButton>
+        </motion.div>
       </div>
 
+      {/* Bottom: actions, the "you're here" card and search */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-safe z-30 mx-auto flex max-w-lg flex-col gap-3 px-4">
+        <div className="flex items-end justify-between">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ ...spring.bouncy, delay: 0.2 }}
+            className="pointer-events-auto"
+          >
+            <IconButton label="Show my location" variant="glass" size="lg" onClick={recenter}>
+              <LocateFixed className="h-6 w-6" strokeWidth={2.2} />
+            </IconButton>
+          </motion.div>
+
+          <motion.button
+            type="button"
+            aria-label="Create a happ"
+            onClick={() => navigate("/create-happ")}
+            initial={{ scale: 0, rotate: -90 }}
+            animate={{ scale: 1, rotate: 0 }}
+            whileTap={{ scale: 0.86, rotate: 45 }}
+            transition={{ ...spring.bouncy, delay: 0.25 }}
+            className="pointer-events-auto flex h-[68px] w-[68px] items-center justify-center rounded-full bg-accent text-accent-foreground shadow-[0_10px_30px_-6px_hsl(var(--accent)/0.7)]"
+          >
+            <HappsMark className="h-9 w-9" />
+          </motion.button>
+        </div>
+
+        <div className="pointer-events-auto empty:hidden">
+          <PushBanner />
+        </div>
+
+        <AnimatePresence>
+          {nearby && (
+            <motion.div
+              key={nearby.id}
+              initial={{ y: 60, opacity: 0, scale: 0.9 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 40, opacity: 0, scale: 0.92, transition: { duration: 0.18 } }}
+              transition={spring.bouncy}
+              className="glass pointer-events-auto flex items-center gap-2.5 rounded-4xl p-2.5 pl-3"
+            >
+              <Pressable
+                pressScale={0.96}
+                onClick={() => navigate(`/happ/${nearby.id}`)}
+                className="flex min-w-0 flex-1 items-center gap-3 text-left"
+              >
+                <Avatar
+                  src={nearby.iconUrl}
+                  name={nearby.name}
+                  size="h-11 w-11"
+                  className={cn("rounded-2xl ring-2", nearby.isActive ? "ring-accent" : "ring-dead")}
+                />
+                <span className="min-w-0">
+                  <span className="block text-[11px] font-bold uppercase tracking-wider text-accent">You’re here</span>
+                  <span className="block truncate text-[15px] font-extrabold">{nearby.name}</span>
+                </span>
+              </Pressable>
+              <Button size="sm" onClick={startPost} className="h-11 px-4">
+                <Camera className="h-[18px] w-[18px]" strokeWidth={2.5} /> Post
+              </Button>
+              <motion.button
+                type="button"
+                aria-label="Dead Happ"
+                onClick={() => setConfirmOpen(true)}
+                whileTap={{ scale: 0.85 }}
+                transition={spring.bouncy}
+                className={cn(
+                  "flex h-11 w-12 shrink-0 items-center justify-center rounded-full font-brunson text-xl",
+                  dhPressed ? "bg-dead text-white" : "bg-dead/15 text-dead",
+                )}
+              >
+                DH
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <motion.button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          initial={{ y: 80, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          whileTap={{ scale: 0.97 }}
+          transition={{ ...spring.snappy, delay: 0.05 }}
+          className="glass pointer-events-auto flex h-[60px] w-full items-center gap-3 rounded-full px-5 text-left"
+        >
+          <Search className="h-5 w-5 text-accent" strokeWidth={2.6} />
+          <span className="flex-1 text-[16px] font-semibold text-muted-foreground">Search happs or people</span>
+          {happs.length > 0 && (
+            <span className="rounded-full bg-accent/15 px-2.5 py-1 text-xs font-bold text-accent">{happs.length} live</span>
+          )}
+        </motion.button>
+      </div>
+
+      <HappSheet happId={selectedId} onClose={closeHapp} onLoaded={onHappLoaded} />
+      <SearchSheet open={searchOpen && active} onClose={() => setSearchOpen(false)} happs={happs} location={location} />
+
       <Sheet
-        open={confirmOpen}
+        open={confirmOpen && active}
         onClose={() => setConfirmOpen(false)}
         variant="dialog"
-        title={<span className="font-brunson text-3xl tracking-wide">{dhPressed ? "Still alive?" : "Dead Happ?"}</span>}
+        title={<span className="font-brunson text-4xl font-normal tracking-wide">{dhPressed ? "Still alive?" : "Dead Happ?"}</span>}
         description={
           dhPressed
-            ? `Remove your Dead Happ vote for ${nearby?.name ?? "this happ"}?`
-            : `Label ${nearby?.name ?? "this happ"} as a Dead Happ? It turns red once most people agree.`
+            ? `Take back your Dead Happ vote for ${nearby?.name ?? "this happ"}?`
+            : `Is ${nearby?.name ?? "this happ"} over? It turns red once most people agree.`
         }
       >
         <div className="flex gap-3">
           <Button variant="secondary" className="flex-1" onClick={() => setConfirmOpen(false)}>
             Cancel
           </Button>
-          <Button variant={dhPressed ? "accent" : "destructive"} className="flex-1" loading={voting} onClick={toggleDeadHapp}>
-            {dhPressed ? "Remove vote" : "Confirm"}
+          <Button variant={dhPressed ? "accent" : "destructive"} className="flex-1" loading={voting} onClick={toggleVote}>
+            {dhPressed ? "Take back" : "It’s dead"}
           </Button>
         </div>
       </Sheet>
