@@ -1,0 +1,18 @@
+# Supabase CLI config. Link to your project with:
+#   supabase link --project-ref <your-project-ref>
+project_id = "the-happs"
+
+[auth]
+site_url = "http://localhost:8080"
+additional_redirect_urls = ["http://localhost:8080"]
+
+# These functions return public values or check auth themselves, so they work
+# with both legacy anon JWTs and the newer publishable keys.
+[functions.get-mapbox-token]
+verify_jwt = false
+
+[functions.get-vapid-key]
+verify_jwt = false
+
+[functions.send-push]
+verify_jwt = false

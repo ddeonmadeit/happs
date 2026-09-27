@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en" class="theme-warm dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <title>The Happs</title>
+    <meta name="description" content="Discover and share what's happening around you in real time." />
+    <meta name="author" content="The Happs" />
+
+    <meta name="theme-color" content="#140e0a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="The Happs" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <link rel="preload" href="/fonts/Brunson.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="The Happs" />
+    <meta property="og:description" content="Discover and share what's happening around you in real time." />
+    <meta property="og:image" content="/icon-512.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="The Happs" />
+    <meta name="twitter:description" content="Discover and share what's happening around you in real time." />
+
+    <script>
+      // Apply the saved theme before first paint so there is no flash of the wrong colours.
+      (function () {
+        try {
+          var scheme = localStorage.getItem("happ-color-scheme") || "warm";
+          var mode = localStorage.getItem("happ-theme-mode") || "dark";
+          var el = document.documentElement;
+          el.className = "theme-" + scheme + (mode === "dark" ? " dark" : "");
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

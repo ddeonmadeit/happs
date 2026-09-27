@@ -1,0 +1,329 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "Brunson";
+  src: url("/fonts/Brunson.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  /* ---- Colour schemes (same palettes as the original app) ---- */
+  :root,
+  .theme-earth {
+    --background: 40 30% 87%;
+    --foreground: 27 35% 7%;
+    --card: 40 32% 91%;
+    --card-foreground: 27 35% 7%;
+    --primary: 27 35% 7%;
+    --primary-foreground: 37 33% 90%;
+    --secondary: 120 28% 19%;
+    --secondary-foreground: 40 30% 93%;
+    --muted: 40 20% 82%;
+    --muted-foreground: 15 18% 36%;
+    --accent: 120 28% 22%;
+    --accent-foreground: 40 30% 93%;
+    --destructive: 359 60% 32%;
+    --destructive-foreground: 40 30% 93%;
+    --border: 40 18% 76%;
+    --input: 40 20% 80%;
+    --ring: 120 28% 22%;
+    --radius: 1rem;
+    --marker-active: 120 28% 26%;
+    --marker-inactive: 359 60% 32%;
+  }
+  .theme-earth.dark {
+    --background: 27 35% 6%;
+    --foreground: 40 30% 88%;
+    --card: 27 28% 10%;
+    --card-foreground: 40 30% 88%;
+    --primary: 40 30% 88%;
+    --primary-foreground: 27 35% 7%;
+    --secondary: 120 28% 25%;
+    --secondary-foreground: 40 30% 93%;
+    --muted: 20 24% 14%;
+    --muted-foreground: 40 16% 62%;
+    --accent: 120 26% 34%;
+    --accent-foreground: 40 30% 95%;
+    --destructive: 359 60% 40%;
+    --destructive-foreground: 40 30% 95%;
+    --border: 20 22% 17%;
+    --input: 20 24% 15%;
+    --ring: 120 26% 40%;
+    --marker-active: 120 30% 42%;
+    --marker-inactive: 359 60% 44%;
+  }
+
+  .theme-warm {
+    --background: 24 100% 96%;
+    --foreground: 22 70% 9%;
+    --card: 24 100% 98%;
+    --card-foreground: 22 70% 9%;
+    --primary: 22 70% 9%;
+    --primary-foreground: 24 100% 96%;
+    --secondary: 29 85% 36%;
+    --secondary-foreground: 24 100% 96%;
+    --muted: 24 45% 90%;
+    --muted-foreground: 22 25% 38%;
+    --accent: 29 85% 40%;
+    --accent-foreground: 24 100% 97%;
+    --destructive: 0 65% 38%;
+    --destructive-foreground: 24 100% 96%;
+    --border: 24 35% 85%;
+    --input: 24 35% 87%;
+    --ring: 29 85% 40%;
+    --radius: 1rem;
+    --marker-active: 29 85% 42%;
+    --marker-inactive: 0 65% 38%;
+  }
+  .theme-warm.dark {
+    --background: 25 32% 5%;
+    --foreground: 24 90% 94%;
+    --card: 25 26% 9%;
+    --card-foreground: 24 90% 94%;
+    --primary: 24 90% 94%;
+    --primary-foreground: 25 32% 6%;
+    --secondary: 29 85% 40%;
+    --secondary-foreground: 24 100% 97%;
+    --muted: 24 22% 13%;
+    --muted-foreground: 24 22% 62%;
+    --accent: 29 85% 48%;
+    --accent-foreground: 25 40% 6%;
+    --destructive: 0 62% 46%;
+    --destructive-foreground: 24 100% 97%;
+    --border: 24 18% 15%;
+    --input: 24 20% 14%;
+    --ring: 29 85% 50%;
+    --marker-active: 29 88% 52%;
+    --marker-inactive: 0 62% 48%;
+  }
+
+  .theme-jaded {
+    --background: 24 100% 96%;
+    --foreground: 0 0% 13%;
+    --card: 24 100% 98%;
+    --card-foreground: 0 0% 13%;
+    --primary: 0 0% 13%;
+    --primary-foreground: 24 100% 96%;
+    --secondary: 93 33% 84%;
+    --secondary-foreground: 0 0% 13%;
+    --muted: 24 30% 90%;
+    --muted-foreground: 0 0% 38%;
+    --accent: 93 26% 40%;
+    --accent-foreground: 24 100% 97%;
+    --destructive: 0 58% 38%;
+    --destructive-foreground: 24 100% 96%;
+    --border: 24 20% 84%;
+    --input: 24 20% 86%;
+    --ring: 93 26% 40%;
+    --radius: 1rem;
+    --marker-active: 93 30% 42%;
+    --marker-inactive: 0 58% 40%;
+  }
+  .theme-jaded.dark {
+    --background: 0 0% 9%;
+    --foreground: 24 100% 95%;
+    --card: 0 0% 12%;
+    --card-foreground: 24 100% 95%;
+    --primary: 24 100% 95%;
+    --primary-foreground: 0 0% 10%;
+    --secondary: 93 33% 84%;
+    --secondary-foreground: 0 0% 12%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 62%;
+    --accent: 93 33% 80%;
+    --accent-foreground: 0 0% 10%;
+    --destructive: 0 58% 48%;
+    --destructive-foreground: 24 100% 96%;
+    --border: 0 0% 17%;
+    --input: 0 0% 15%;
+    --ring: 93 33% 80%;
+    --marker-active: 93 38% 66%;
+    --marker-inactive: 0 58% 50%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+    /* The old app padded <body> for the notch *and* every page did it again. */
+    overscroll-behavior: none;
+    text-rendering: optimizeLegibility;
+    transition: background-color 0.3s ease;
+  }
+
+  button,
+  a,
+  input,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:focus-visible,
+  a:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  ::selection {
+    @apply bg-accent/30;
+  }
+}
+
+@layer utilities {
+  .h-dvh-screen {
+    height: 100vh;
+    height: 100dvh;
+  }
+  .min-h-dvh-screen {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  .pt-safe {
+    padding-top: max(env(safe-area-inset-top), 0.75rem);
+  }
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 0.75rem);
+  }
+  .bottom-safe {
+    bottom: max(env(safe-area-inset-bottom), 1rem);
+  }
+  .top-safe {
+    top: max(env(safe-area-inset-top), 0.75rem);
+  }
+  .glass {
+    @apply border border-foreground/10 bg-background/70 shadow-lg shadow-black/10 backdrop-blur-xl;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .pressable {
+    @apply transition-transform duration-150 ease-smooth active:scale-[0.96];
+  }
+}
+
+/* ---- Map ----
+   mapbox-gl.css loads after this file, so overrides are scoped under
+   .mapboxgl-map to win on specificity. */
+.mapboxgl-map {
+  font-family: inherit;
+}
+/* Keep Mapbox's required logo/attribution visible, just above the bottom dock. */
+.mapboxgl-map .mapboxgl-ctrl-bottom-left,
+.mapboxgl-map .mapboxgl-ctrl-bottom-right {
+  bottom: calc(max(env(safe-area-inset-bottom), 1rem) + 9.5rem);
+  opacity: 0.55;
+}
+
+.user-dot {
+  z-index: 5;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: hsl(var(--accent));
+  border: 3px solid white;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+}
+.user-dot::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  background: hsl(var(--accent) / 0.35);
+  animation: marker-pulse 2s ease-out infinite;
+  z-index: -1;
+}
+
+.happ-marker {
+  --marker-color: var(--marker-active);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  cursor: pointer;
+  background: hsl(var(--muted));
+  border: 2.5px solid hsl(var(--marker-color));
+  box-shadow:
+    0 0 0 4px hsl(var(--marker-color) / 0.25),
+    0 6px 18px -4px rgb(0 0 0 / 0.45);
+  transition:
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s ease;
+  animation: pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+.happ-marker.is-dead {
+  --marker-color: var(--marker-inactive);
+  filter: saturate(0.6);
+}
+.happ-marker:hover {
+  transform: scale(1.08);
+}
+.happ-marker img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 9999px;
+}
+.happ-marker span {
+  font-weight: 700;
+  color: hsl(var(--foreground));
+}
+.happ-marker:not(.is-dead)::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  border: 2px solid hsl(var(--marker-color));
+  animation: marker-pulse 2.4s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes marker-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
