@@ -94,13 +94,11 @@ export const HappMap = forwardRef<HappMapHandle, HappMapProps>(
           maxZoom: 18,
           maxBounds: MAP_BOUNDS,
           attributionControl: false,
-          logoPosition: "top-left",
           pitchWithRotate: false,
           dragRotate: false,
           fadeDuration: 200,
         });
         map.touchZoomRotate.disableRotation();
-        map.addControl(new mapboxgl.AttributionControl({ compact: true }), "top-right");
         map.on("load", () => {
           if (!cancelled) setReady(true);
         });

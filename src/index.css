@@ -168,34 +168,63 @@
 .mapboxgl-map {
   font-family: inherit;
 }
-/* Mapbox's logo and attribution sit up top, under the profile/messages
-   buttons, where the bottom controls can't cover them. */
-.mapboxgl-map .mapboxgl-ctrl-top-left,
-.mapboxgl-map .mapboxgl-ctrl-top-right {
-  top: calc(max(env(safe-area-inset-top), 0.75rem) + 4rem);
-  opacity: 0.45;
-}
-.mapboxgl-map .mapboxgl-ctrl-top-left {
-  left: 6px;
+/* No Mapbox logo or attribution on the map (as in the original app). */
+.mapboxgl-map .mapboxgl-ctrl-logo,
+.mapboxgl-map .mapboxgl-ctrl-attrib {
+  display: none !important;
 }
 
+/*
+ * "You are here": the original app's indicator, exactly. That was Mapbox's
+ * user-location dot recoloured with the Warm theme orange, hsl(29 85% 36%):
+ * a 15px dot inside a solid 19px ring, with a halo pulsing out to 3x every
+ * 2s, and no heading arrow.
+ */
 .user-dot {
+  --location: hsl(29 85% 36%); /* #aa590e */
   z-index: 5;
-  width: 20px;
-  height: 20px;
-  border-radius: 9999px;
-  background: #4ea1ff;
-  border: 3px solid white;
-  box-shadow: 0 2px 10px rgb(0 0 0 / 0.4);
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background-color: var(--location);
 }
 .user-dot::before {
   content: "";
   position: absolute;
-  inset: -3px;
-  border-radius: 9999px;
-  background: rgb(78 161 255 / 0.35);
-  animation: halo 2s ease-out infinite;
-  z-index: -1;
+  top: 0;
+  left: 0;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background-color: var(--location);
+  animation: user-location-pulse 2s infinite;
+}
+.user-dot::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  width: 19px;
+  height: 19px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid var(--location);
+  background-color: var(--location);
+  box-shadow: 0 0 3px rgb(0 0 0 / 0.35);
+}
+@keyframes user-location-pulse {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  70% {
+    opacity: 0;
+    transform: scale(3);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
 }
 
 /* Markers: Mapbox positions the outer element with transform, so all
