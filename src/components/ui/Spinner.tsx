@@ -10,7 +10,7 @@ export function Spinner({ className }: { className?: string }) {
 /** Brand loader: the Happs mark gently bouncing. */
 export function FullScreenLoader() {
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-background">
+    <div className="absolute inset-0 flex items-center justify-center bg-app">
       <motion.div
         animate={{ y: [0, -14, 0], scale: [1, 1.06, 1] }}
         transition={{ duration: 0.9, repeat: Infinity, ease: [0.34, 1.56, 0.64, 1] }}

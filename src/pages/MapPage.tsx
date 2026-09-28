@@ -138,7 +138,7 @@ export default function MapPage({ active }: { active: boolean }) {
   };
 
   return (
-    <div className="absolute inset-0 overflow-hidden bg-background" aria-hidden={!active}>
+    <div className="absolute inset-0 overflow-hidden bg-app" aria-hidden={!active}>
       <HappMap
         ref={mapRef}
         happs={happs}

@@ -174,8 +174,14 @@ and `MAP_CENTER` in `src/lib/constants.ts` to open it up.
 
 ### Design
 
-- **One theme:** charcoal surfaces (`#1c1c1f`) with orange (`#ff7a1a`)
-  highlights. Red is used only for Dead Happs.
+- **One theme:** warm dark charcoal (`#1d1b18`) that deepens into an ombré,
+  with film grain, and orange highlights (`#e44d18`). Red is used only for
+  Dead Happs.
+- **Living brand texture:** the wordmark, logo and orange buttons use the
+  glitch-art texture (`public/textures/`). Yellow, red and amber blobs drift
+  slowly through it, and a hot spot follows your finger when you slide it
+  across (`src/lib/glitch.ts`). Text and the logo use a cut of the texture
+  with no black in it.
 - **Waze-style map screen:** your avatar top-left and messages top-right; a
   big orange **+** to start a happ; a search pill at the bottom. A "You're
   here" card with **Post** and **DH** springs up only when you're actually at a

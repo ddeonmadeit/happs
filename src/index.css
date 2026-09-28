@@ -61,7 +61,7 @@
   }
 
   body {
-    @apply bg-background font-sans text-foreground antialiased;
+    @apply bg-app font-sans text-foreground antialiased;
     text-rendering: optimizeLegibility;
     touch-action: manipulation;
     -webkit-user-select: none;
@@ -135,30 +135,167 @@
     @apply border border-white/[0.08] bg-[#2d2a27]/95 shadow-[0_10px_30px_rgb(0_0_0/0.5)] backdrop-blur-xl;
   }
   /*
-   * The brand texture: orange streaks through a cream-gold core with dark
-   * glitch edges and film grain (public/textures/glitch.webp, cut from the
-   * reference artwork). Solid orange shows while it loads.
+   * Page background: warm charcoal that deepens towards the bottom (a dark
+   * ombré), a soft vignette, and film grain with faint horizontal streaks
+   * (public/textures/grain.webp) so it never looks flat.
    */
-  .glitch-bg {
-    background-color: hsl(var(--accent));
-    background-image: url("/textures/glitch.webp");
-    background-size: cover;
-    background-position: 40% 50%;
+  .bg-app {
+    background-color: hsl(var(--background));
+    background-image:
+      url("/textures/grain.webp"),
+      radial-gradient(140% 100% at 50% 30%, transparent 50%, rgb(0 0 0 / 0.4) 100%),
+      radial-gradient(120% 60% at 50% 0%, hsl(30 10% 16%) 0%, transparent 75%),
+      linear-gradient(172deg, hsl(30 10% 12.5%) 0%, hsl(30 10% 9.5%) 48%, hsl(28 12% 5%) 100%);
+    background-size: 128px 128px, 100% 100%, 100% 100%, 100% 100%;
+    background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+    background-blend-mode: overlay, normal, normal, normal;
   }
-  .glitch-text {
+
+  /*
+   * The brand texture: orange streaks through a cream-gold core with glitch
+   * edges and film grain (public/textures/, cut from the reference artwork).
+   * Blobs of yellow, red and amber drift through it (`--blob-*`, animated
+   * below) and a hot spot follows your finger (`--touch-*`, set by
+   * src/lib/glitch.ts). Solid orange shows while the image loads.
+   */
+  .glitch-bg,
+  .glitch-text,
+  .glitch-mark {
+    --glitch-fx:
+      radial-gradient(
+        circle var(--touch-r, 64px) at var(--touch-x, 50%) var(--touch-y, 50%),
+        rgb(255 214 96 / calc(var(--touch-a, 0) * 0.85)) 0%,
+        rgb(255 170 40 / calc(var(--touch-a, 0) * 0.45)) 45%,
+        transparent 100%
+      ),
+      radial-gradient(60% 100% at var(--blob-1x, 22%) var(--blob-1y, 28%), rgb(255 208 64 / 0.6), transparent 70%),
+      radial-gradient(55% 95% at var(--blob-2x, 78%) var(--blob-2y, 72%), rgb(210 26 6 / 0.6), transparent 70%),
+      radial-gradient(50% 90% at var(--blob-3x, 50%) var(--blob-3y, 50%), rgb(255 132 20 / 0.5), transparent 70%);
     background-color: hsl(var(--accent));
-    background-image: url("/textures/glitch.webp");
+    background-repeat: no-repeat;
+    /* The touch spot lightens (screen); the blobs tint (overlay). */
+    background-blend-mode: screen, overlay, overlay, overlay, normal;
+  }
+  .glitch-bg {
+    background-image: var(--glitch-fx), url("/textures/glitch.webp");
+    background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, cover;
+    background-position: 0 0, 0 0, 0 0, 0 0, 40% 50%;
+  }
+  /* Text and the logo use the warm cut: its darkest tone is orange-red,
+     never black. */
+  .glitch-text {
+    background-image: var(--glitch-fx), url("/textures/glitch-warm.webp");
     background-size: 100% 100%;
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
     -webkit-text-fill-color: transparent;
   }
+  .glitch-mark {
+    background-image: var(--glitch-fx), url("/textures/glitch-warm.webp");
+    background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, cover;
+    background-position: center;
+    -webkit-mask: var(--mark) center / contain no-repeat;
+    mask: var(--mark) center / contain no-repeat;
+  }
+  /* Only where the blob positions can be animated smoothly (registered
+     custom properties); elsewhere the blobs simply sit still. */
+  .fluid :is(.glitch-bg, .glitch-text, .glitch-mark) {
+    animation:
+      glitch-blob-1 9s ease-in-out infinite,
+      glitch-blob-2 12s ease-in-out infinite,
+      glitch-blob-3 15s ease-in-out infinite;
+  }
   .no-scrollbar {
     scrollbar-width: none;
   }
   .no-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+}
+
+/* ---- Brand texture motion ---- */
+@property --blob-1x {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 22%;
+}
+@property --blob-1y {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 28%;
+}
+@property --blob-2x {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 78%;
+}
+@property --blob-2y {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 72%;
+}
+@property --blob-3x {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 50%;
+}
+@property --blob-3y {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 50%;
+}
+@keyframes glitch-blob-1 {
+  0%,
+  100% {
+    --blob-1x: 22%;
+    --blob-1y: 28%;
+  }
+  25% {
+    --blob-1x: 68%;
+    --blob-1y: 76%;
+  }
+  50% {
+    --blob-1x: 88%;
+    --blob-1y: 24%;
+  }
+  75% {
+    --blob-1x: 38%;
+    --blob-1y: 88%;
+  }
+}
+@keyframes glitch-blob-2 {
+  0%,
+  100% {
+    --blob-2x: 78%;
+    --blob-2y: 72%;
+  }
+  33% {
+    --blob-2x: 18%;
+    --blob-2y: 62%;
+  }
+  66% {
+    --blob-2x: 56%;
+    --blob-2y: 12%;
+  }
+}
+@keyframes glitch-blob-3 {
+  0%,
+  100% {
+    --blob-3x: 50%;
+    --blob-3y: 50%;
+  }
+  25% {
+    --blob-3x: 12%;
+    --blob-3y: 18%;
+  }
+  50% {
+    --blob-3x: 34%;
+    --blob-3y: 92%;
+  }
+  75% {
+    --blob-3x: 92%;
+    --blob-3y: 58%;
   }
 }
 

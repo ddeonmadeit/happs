@@ -13,7 +13,7 @@ export default function Welcome() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: 0.2 } }}
-      className="absolute inset-0 z-40 flex flex-col items-center overflow-hidden bg-background px-6 pb-safe pt-safe"
+      className="absolute inset-0 z-40 flex flex-col items-center overflow-hidden bg-app px-6 pb-safe pt-safe"
     >
       {/* A faint warm glow behind the logo; the page stays charcoal. */}
       <div
@@ -28,10 +28,11 @@ export default function Welcome() {
           transition={{ ...spring.bouncy, delay: 0.1 }}
         >
           <motion.div
-            animate={{ y: [0, -8, 0] }}
+            animate={{ y: [0, -6, 0] }}
             transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+            className="drop-shadow-[0_10px_24px_hsl(var(--accent)/0.22)]"
           >
-            <HappsMark glitch className="h-24 w-24 drop-shadow-[0_10px_24px_hsl(var(--accent)/0.22)]" />
+            <HappsMark glitch className="h-24 w-24" />
           </motion.div>
         </motion.div>
 
@@ -39,7 +40,7 @@ export default function Welcome() {
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...spring.gentle, delay: 0.3 }}
-          className="mt-10 text-center text-[clamp(3.8rem,18vw,5.5rem)]"
+          className="mt-1 text-center text-[clamp(3.8rem,18vw,5.5rem)] leading-none"
         >
           <Wordmark />
         </motion.h1>
@@ -47,7 +48,7 @@ export default function Welcome() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ ...spring.gentle, delay: 0.42 }}
-          className="mt-1 whitespace-nowrap text-center text-[clamp(1rem,4.6vw,1.2rem)] font-semibold text-cream"
+          className="mt-1.5 whitespace-nowrap text-center text-[clamp(1rem,4.6vw,1.2rem)] font-semibold text-cream"
         >
           What’s happening in Sydney?
         </motion.p>

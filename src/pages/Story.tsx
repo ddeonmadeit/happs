@@ -118,7 +118,7 @@ export default function Story() {
 
   if (!post) {
     return (
-      <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4 bg-background p-8 text-center">
+      <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4 bg-app p-8 text-center">
         <p className="text-lg font-bold">No posts here yet</p>
         <Button variant="secondary" onClick={close}>
           Go back

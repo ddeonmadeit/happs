@@ -182,7 +182,7 @@ export const HappMap = forwardRef<HappMapHandle, HappMapProps>(
     }, [happs, ready, selectedId]);
 
     return (
-      <div className={cn("relative h-full w-full bg-background", className)}>
+      <div className={cn("relative h-full w-full bg-app", className)}>
         {/* Sized with h/w (not inset) — mapbox-gl.css forces position: relative on this element. */}
         <div ref={containerRef} className="h-full w-full" />
         {failed && (

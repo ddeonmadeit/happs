@@ -3,7 +3,7 @@ import { HappsMark, Wordmark } from "@/components/Logo";
 /** Shown instead of a blank crash when the Supabase env vars are missing. */
 export default function SetupRequired() {
   return (
-    <div className="scroll-area absolute inset-0 flex items-center justify-center bg-background p-6">
+    <div className="scroll-area absolute inset-0 flex items-center justify-center bg-app p-6">
       <div className="w-full max-w-md space-y-6 text-center">
         <HappsMark glitch className="mx-auto h-14 w-14" />
         <Wordmark className="text-5xl" />

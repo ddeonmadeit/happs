@@ -40,7 +40,7 @@ export function Screen({ children, className }: { children: ReactNode; className
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 48, scale: 0.97, transition: { duration: 0.22, ease: [0.4, 0, 1, 1] } }}
       transition={spring.gentle}
-      className={cn("absolute inset-0 z-40 flex flex-col overflow-hidden bg-background", className)}
+      className={cn("absolute inset-0 z-40 flex flex-col overflow-hidden bg-app", className)}
     >
       {children}
     </motion.div>
