@@ -15,22 +15,23 @@ export default function Welcome() {
       exit={{ opacity: 0, transition: { duration: 0.2 } }}
       className="absolute inset-0 z-40 flex flex-col items-center overflow-hidden bg-app px-6 pb-safe pt-safe"
     >
-      {/* A faint warm glow behind the logo; the page stays charcoal. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute left-1/2 top-[38%] h-[340px] w-[340px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/[0.05] blur-3xl"
-      />
-
       <div className="relative flex flex-1 flex-col items-center justify-center">
         <motion.div
           initial={{ scale: 0, rotate: -120 }}
           animate={{ scale: 1, rotate: 0 }}
           transition={{ ...spring.bouncy, delay: 0.1 }}
+          className="relative"
         >
+          {/* A faint warm glow behind the logo, drawn as a gradient: a blurred
+              element here got clipped into a hard band on iPhone. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute left-1/2 top-1/2 h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,hsl(var(--accent)/0.1),hsl(var(--accent)/0.035)_55%,transparent)]"
+          />
           <motion.div
             animate={{ y: [0, -6, 0] }}
             transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-            className="drop-shadow-[0_10px_24px_hsl(var(--accent)/0.22)]"
+            className="relative"
           >
             <HappsMark glitch className="h-24 w-24" />
           </motion.div>

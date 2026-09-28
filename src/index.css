@@ -19,9 +19,9 @@
     --card-foreground: 38 30% 94%;
     --muted: 30 7% 14%; /* #272421 */
     --muted-foreground: 32 8% 60%;
-    --primary: 29 84% 53%; /* #ec8423 — Tarantino amber */
+    --primary: 26 84% 52%; /* #eb771e — Tarantino orange */
     --primary-foreground: 30 12% 7%;
-    --accent: 29 84% 53%;
+    --accent: 26 84% 52%;
     --accent-foreground: 30 12% 7%;
     --secondary: 30 7% 14%;
     --secondary-foreground: 38 30% 94%;
@@ -30,9 +30,9 @@
     --border: 30 7% 16.5%;
     --input: 30 7% 14%;
     --cream: 40 52% 86%; /* #eee1c9 */
-    --ring: 29 84% 53%;
+    --ring: 26 84% 52%;
     --radius: 1.25rem;
-    --marker-active: 29 84% 53%;
+    --marker-active: 26 84% 52%;
     --marker-inactive: 10 78% 47%; /* #d53a1a — Dead Happs and the DH button */
     color-scheme: dark;
   }
@@ -168,18 +168,27 @@
       transparent 100%
     );
     --glitch-blobs:
-      radial-gradient(60% 100% at var(--blob-1x, 22%) var(--blob-1y, 28%), rgb(255 214 90 / 0.5), transparent 70%),
-      radial-gradient(55% 95% at var(--blob-2x, 78%) var(--blob-2y, 72%), rgb(196 84 22 / 0.42), transparent 70%),
-      radial-gradient(50% 90% at var(--blob-3x, 50%) var(--blob-3y, 50%), rgb(255 160 50 / 0.42), transparent 70%);
+      radial-gradient(60% 100% at var(--blob-1x, 22%) var(--blob-1y, 28%), var(--blob-a, rgb(255 200 84 / 0.48)), transparent 70%),
+      radial-gradient(55% 95% at var(--blob-2x, 78%) var(--blob-2y, 72%), var(--blob-b, rgb(192 74 20 / 0.42)), transparent 70%),
+      radial-gradient(50% 90% at var(--blob-3x, 50%) var(--blob-3y, 50%), var(--blob-c, rgb(255 146 44 / 0.42)), transparent 70%);
     background-color: hsl(var(--accent));
     background-repeat: no-repeat;
   }
   .glitch-bg {
-    background-image: var(--glitch-touch), var(--glitch-blobs), url("/textures/gold.webp");
+    background-image: var(--glitch-touch), var(--glitch-blobs), var(--glitch-texture, url("/textures/gold.webp"));
     background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, cover;
     background-position: 0 0, 0 0, 0 0, 0 0, 40% 50%;
     /* The touch spot lightens (screen); the blobs tint (overlay). */
     background-blend-mode: screen, overlay, overlay, overlay, normal;
+  }
+  /* The same living texture in dark red (the DH button). */
+  .glitch-red {
+    --glitch-texture: url("/textures/ember.webp");
+    --blob-a: rgb(236 92 44 / 0.4);
+    --blob-b: rgb(70 6 4 / 0.45);
+    --blob-c: rgb(196 52 24 / 0.4);
+    background-color: #7a1b0e;
+    color: hsl(var(--cream));
   }
   /* Text: the same, plus two layers of glitch lines sliding past each other
      (public/textures/lines.webp tiles seamlessly left to right). */
@@ -199,7 +208,7 @@
   }
   /* The logo: a clean gold gradient (no streaks), with the same living colour. */
   .glitch-mark {
-    background-image: var(--glitch-touch), var(--glitch-blobs), linear-gradient(160deg, #f7cf6e 0%, #f0a43c 45%, #df7426 100%);
+    background-image: var(--glitch-touch), var(--glitch-blobs), linear-gradient(160deg, #f5bd5e 0%, #ec8f32 45%, #da6a22 100%);
     background-size: 100% 100%;
     background-blend-mode: screen, overlay, overlay, overlay, normal;
     -webkit-mask: var(--mark) center / contain no-repeat;

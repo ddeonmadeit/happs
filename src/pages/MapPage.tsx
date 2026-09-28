@@ -273,9 +273,8 @@ export default function MapPage({ active }: { active: boolean }) {
                 aria-pressed={dhPressed}
                 className={cn(
                   "flex h-11 w-12 shrink-0 items-center justify-center rounded-full text-[15px] font-black tracking-tight",
-                  dhPressed
-                    ? "bg-dead text-cream shadow-[0_6px_18px_-6px_hsl(var(--marker-inactive)/0.8)]"
-                    : "bg-dead/15 text-dead ring-1 ring-inset ring-dead/30",
+                  "glitch-bg glitch-red text-cream shadow-[0_6px_20px_-6px_rgb(150_30_12/0.7)]",
+                  dhPressed && "ring-2 ring-cream/80 ring-offset-2 ring-offset-[#24211e]",
                 )}
               >
                 DH
@@ -328,8 +327,7 @@ export default function MapPage({ active }: { active: boolean }) {
             Cancel
           </Button>
           <Button
-            variant={dhPressed ? "accent" : "destructive"}
-            className={cn("flex-1", !dhPressed && "bg-dead text-cream shadow-[0_6px_20px_-6px_hsl(var(--marker-inactive)/0.6)]")}
+            className={cn("flex-1", !dhPressed && "glitch-red text-cream shadow-[0_6px_20px_-6px_rgb(150_30_12/0.7)]")}
             loading={voting}
             onClick={toggleVote}
           >
