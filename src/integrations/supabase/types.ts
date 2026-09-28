@@ -1,4 +1,4 @@
-// Database types matching supabase/migrations/20260927000000_init.sql.
+// Database types matching supabase/migrations/.
 // Regenerate with: supabase gen types typescript --linked > src/integrations/supabase/types.ts
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
@@ -44,6 +44,8 @@ export type HappRow = {
   last_activity_at: string;
   created_at: string;
   updated_at: string;
+  /** When it goes live (scheduled happs). Missing on the original backend, which uses created_at. */
+  starts_at?: string;
 };
 
 export type HappParticipantRow = {
@@ -63,7 +65,8 @@ export type PostRow = {
   happ_id: string;
   user_id: string;
   media_url: string;
-  media_type: "image" | "video";
+  /** "image" | "video" here; the original backend labels photos differently (see isVideoPost). */
+  media_type: string;
   caption: string | null;
   created_at: string;
 };
@@ -117,6 +120,7 @@ export type MapHappRow = {
   post_count: number;
   last_activity_at: string;
   created_at: string;
+  starts_at: string;
 };
 
 export type ConversationSummaryRow = {

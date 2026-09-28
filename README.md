@@ -48,6 +48,14 @@ none of this repo's server-side functions. `src/lib/api.ts` detects this and
 falls back to the queries the original app made. On that backend, push
 notifications stay hidden because it never had a subscriptions table.
 
+Two quirks of that backend are handled in the app:
+
+- Its `posts.media_type` check rejects `"image"`, the label the old app sent,
+  so every photo post in the old app silently failed. The app tries the usual
+  labels in turn (`photo`, …) and remembers the one the database accepts.
+- It has no `starts_at` column, so a scheduled happ is stored with
+  `created_at` (and `last_activity_at`) set to its start time.
+
 To move to your own project with the full backend below, add these under
 **Settings → Secrets and variables → Actions → Variables** and re-run the
 workflow:
@@ -132,6 +140,9 @@ Rules the database enforces (instead of trusting the browser):
 
 - A happ shows on the map for 24 h after it's created, as long as there's been
   activity in the last 2 h (`get_map_happs`).
+- A happ can be scheduled up to 60 days ahead (`starts_at`). Until then it
+  shows on the map faded, nobody can post to it, and its 2-hour activity
+  window only starts at the start time.
 - Posting joins you to the happ, bumps its activity and clears your own DH vote.
 - A happ turns **dead** (red) once more than half its participants have voted DH
   (`toggle_dead_happ`). Only participants can vote.
@@ -188,7 +199,12 @@ and `MAP_CENTER` in `src/lib/constants.ts` to open it up.
   happ.
 - **Happs open as a card over the map** (`/happ/:id`), with the story ring,
   who's there, and Join & post. Search opens as a sheet listing what's on
-  nearest to you.
+  nearest to you, then what's coming up.
+- **Plan ahead:** a new happ can start **now** or **later** (pick a date and
+  time). Scheduled happs sit faded on the map with their start time and open
+  for stories when they begin.
+- **Put it anywhere:** the happ's location defaults to where you are; tap it to
+  drag a pin on a map or search for a venue or address.
 - **Springs everywhere:** buttons squish when pressed, sheets spring up and
   swipe down to close, markers drop in with a bounce, screens slide over the
   map and away again, stories swipe left/right and down to close, tabs slide,
@@ -200,6 +216,10 @@ and `MAP_CENTER` in `src/lib/constants.ts` to open it up.
 ### Bugs fixed
 
 **Posting and camera**
+- Photo posts never saved on the original backend: its `media_type` check
+  rejected the label the app sent, and the old app hid the error. Fixed.
+- If a new happ's first post failed, trying again created another copy of the
+  happ. A retry now posts to the happ that was already created.
 - Captured photos and videos were stored as base64 in `sessionStorage`. Anything
   over about 5 MB (most videos) hit the storage quota and the preview never
   opened. Media now stays in memory as a `Blob`.
@@ -238,7 +258,9 @@ and `MAP_CENTER` in `src/lib/constants.ts` to open it up.
 - Your Dead Happ vote (the red ring on your avatar) reset on every reload.
 - Dead Happ votes and happ status were written directly from the browser. They
   now go through a server-side function.
-- Participant counts were set to 1 on creation and never updated.
+- Participant counts were set to 1 on creation and never updated (and on the
+  original backend, a trigger then added 1 more, so every new happ showed two
+  people).
 - Location was read once, so "nearby" went stale as you walked around. It's now
   watched continuously.
 - The Create Happ location always said "NSW", whatever the real state was.

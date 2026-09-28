@@ -14,12 +14,12 @@ import { Field, Input, Textarea } from "@/components/ui/Input";
 import { Sheet } from "@/components/ui/Sheet";
 import { FullScreenLoader, Spinner } from "@/components/ui/Spinner";
 import { Screen, Stagger, StaggerItem, spring } from "@/components/motion";
-import { fetchJoinedHapps, getOrCreateConversation } from "@/lib/api";
+import { fetchJoinedHapps, getOrCreateConversation, isVideoPost } from "@/lib/api";
 import { normalizeUsername, validateUsername } from "@/lib/constants";
 import { resizeImage, uploadMedia } from "@/lib/media";
 import { cn, errorMessage, shortTimeAgo } from "@/lib/utils";
 
-type GridPost = { id: string; media_url: string; media_type: "image" | "video"; happ_id: string };
+type GridPost = { id: string; media_url: string; media_type: string; happ_id: string };
 type JoinedHapp = HappRow;
 
 export default function Profile() {
@@ -266,7 +266,7 @@ export default function Profile() {
                   to={`/happ/${p.happ_id}/story/${targetId}?post=${p.id}`}
                   className="relative block aspect-square overflow-hidden rounded-2xl bg-muted"
                 >
-                  {p.media_type === "video" ? (
+                  {isVideoPost(p) ? (
                     <>
                       <video src={`${p.media_url}#t=0.1`} className="h-full w-full object-cover" muted playsInline preload="metadata" />
                       <Play className="absolute right-2 top-2 h-4 w-4 fill-white text-white drop-shadow" />

@@ -17,7 +17,7 @@ export default function NotFound() {
         <HappsMark className="h-14 w-14 text-muted-foreground/50" />
       </motion.div>
       <div className="space-y-1">
-        <motion.p initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={spring.bouncy} className="font-brunson text-7xl text-accent">
+        <motion.p initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={spring.bouncy} className="glitch-text text-7xl font-black tracking-tight">
           404
         </motion.p>
         <p className="text-lg font-extrabold">Nothing happening here</p>

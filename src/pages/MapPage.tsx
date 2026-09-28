@@ -8,6 +8,7 @@ import { usePush } from "@/contexts/PushContext";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useDebounced, useRealtime } from "@/hooks/useRealtime";
 import { useUnreadCount } from "@/hooks/useUnreadCount";
+import { useNow } from "@/hooks/useNow";
 import { HappMap, type HappMapHandle } from "@/components/HappMap";
 import { HappSheet } from "@/components/map/HappSheet";
 import { SearchSheet } from "@/components/map/SearchSheet";
@@ -18,7 +19,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button, IconButton } from "@/components/ui/Button";
 import { useGoBack } from "@/components/TopBar";
-import { fetchMapHapps, fetchMyDeadHappVote, NotParticipantError, toggleDeadHapp, type MapHapp } from "@/lib/api";
+import { fetchMapHapps, fetchMyDeadHappVote, isUpcoming, NotParticipantError, toggleDeadHapp, type MapHapp } from "@/lib/api";
 import { draftStore } from "@/lib/draft";
 import { NEARBY_RADIUS_M } from "@/lib/constants";
 import { cn, distanceMeters, errorMessage } from "@/lib/utils";
@@ -81,9 +82,13 @@ export default function MapPage({ active }: { active: boolean }) {
     if (active) loadHapps();
   }, [active, loadHapps]);
 
+  // Scheduled happs sit faded on the map until they start; only live ones count here.
+  const now = useNow();
+  const liveHapps = useMemo(() => happs.filter((h) => !isUpcoming(h.startsAt, now)), [happs, now]);
+
   const nearby = useMemo(
-    () => (location ? nearestHapp(happs, location.latitude, location.longitude) : null),
-    [happs, location],
+    () => (location ? nearestHapp(liveHapps, location.latitude, location.longitude) : null),
+    [liveHapps, location],
   );
 
   useEffect(() => {
@@ -144,6 +149,7 @@ export default function MapPage({ active }: { active: boolean }) {
         happs={happs}
         selectedId={selectedId}
         userLocation={location}
+        now={now}
         onHappClick={(id) => navigate(`/happ/${id}`, { replace: Boolean(selectedId) })}
         className="absolute inset-0"
       />
@@ -158,7 +164,10 @@ export default function MapPage({ active }: { active: boolean }) {
           animate={{ scale: 1, opacity: 1 }}
           whileTap={{ scale: 0.85 }}
           transition={{ ...spring.bouncy, delay: 0.1 }}
-          className={cn("glass pointer-events-auto rounded-full p-1", dhPressed && "ring-[3px] ring-dead")}
+          className={cn(
+            "glass pointer-events-auto flex items-center justify-center rounded-full p-1",
+            dhPressed && "ring-[3px] ring-accent",
+          )}
         >
           <Avatar src={profile?.avatar_url} name={profile?.display_name || profile?.username} size="h-11 w-11" />
         </motion.button>
@@ -261,12 +270,13 @@ export default function MapPage({ active }: { active: boolean }) {
                 onClick={() => setConfirmOpen(true)}
                 whileTap={{ scale: 0.85 }}
                 transition={spring.bouncy}
+                aria-pressed={dhPressed}
                 className={cn(
-                  "flex h-11 w-12 shrink-0 items-center justify-center rounded-full font-brunson text-xl",
-                  dhPressed ? "bg-dead text-white" : "bg-dead/15 text-dead",
+                  "flex h-11 w-12 shrink-0 items-center justify-center rounded-full text-[15px] font-black tracking-tight",
+                  dhPressed ? "glitch-bg text-accent-foreground" : "bg-white/[0.07] ring-1 ring-inset ring-white/[0.06]",
                 )}
               >
-                DH
+                <span className={cn(!dhPressed && "glitch-text")}>DH</span>
               </motion.button>
             </motion.div>
           )}
@@ -283,20 +293,20 @@ export default function MapPage({ active }: { active: boolean }) {
         >
           <Search className="h-5 w-5 text-accent" strokeWidth={2.6} />
           <span className="flex-1 text-[16px] font-semibold text-muted-foreground">Search happs or people</span>
-          {happs.length > 0 && (
-            <span className="rounded-full bg-accent/15 px-2.5 py-1 text-xs font-bold text-accent">{happs.length} live</span>
+          {liveHapps.length > 0 && (
+            <span className="rounded-full bg-accent/15 px-2.5 py-1 text-xs font-bold text-accent">{liveHapps.length} live</span>
           )}
         </motion.button>
       </div>
 
       <HappSheet happId={selectedId} onClose={closeHapp} onLoaded={onHappLoaded} />
-      <SearchSheet open={searchOpen && active} onClose={() => setSearchOpen(false)} happs={happs} location={location} />
+      <SearchSheet open={searchOpen && active} onClose={() => setSearchOpen(false)} happs={happs} location={location} now={now} />
 
       <Sheet
         open={confirmOpen && active}
         onClose={() => setConfirmOpen(false)}
         variant="dialog"
-        title={<span className="font-brunson text-4xl font-normal tracking-wide">{dhPressed ? "Still alive?" : "Dead Happ?"}</span>}
+        title={dhPressed ? "Still alive?" : "Dead Happ?"}
         description={
           dhPressed
             ? `Take back your Dead Happ vote for ${nearby?.name ?? "this happ"}?`
@@ -307,7 +317,7 @@ export default function MapPage({ active }: { active: boolean }) {
           <Button variant="secondary" className="flex-1" onClick={() => setConfirmOpen(false)}>
             Cancel
           </Button>
-          <Button variant={dhPressed ? "accent" : "destructive"} className="flex-1" loading={voting} onClick={toggleVote}>
+          <Button className="flex-1" loading={voting} onClick={toggleVote}>
             {dhPressed ? "Take back" : "It’s dead"}
           </Button>
         </div>

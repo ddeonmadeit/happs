@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { formatDistanceToNowStrict } from "date-fns";
+import { differenceInCalendarDays, format, formatDistanceToNowStrict } from "date-fns";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -37,6 +37,32 @@ export function shortTimeAgo(date: string | Date) {
 export function timeAgo(date: string | Date) {
   const text = formatDistanceToNowStrict(new Date(date), { addSuffix: true });
   return text.includes("second") ? "just now" : text;
+}
+
+/** When a scheduled happ starts: "today at 8:00 pm", "Sat at 8:00 pm", "Sat 4 Oct at 8:00 pm". */
+export function formatStart(date: string | Date) {
+  const d = new Date(date);
+  const days = differenceInCalendarDays(d, new Date());
+  const time = format(d, "h:mm a").toLowerCase();
+  if (days === 0) return `today at ${time}`;
+  if (days === 1) return `tomorrow at ${time}`;
+  if (days > 1 && days < 7) return `${format(d, "EEE")} at ${time}`;
+  return `${format(d, "EEE d MMM")} at ${time}`;
+}
+
+/** Compact start for badges: "8pm", "Sat 8pm", "4 Oct". */
+export function shortStart(date: string | Date) {
+  const d = new Date(date);
+  const days = differenceInCalendarDays(d, new Date());
+  const time = format(d, d.getMinutes() ? "h:mma" : "ha").toLowerCase();
+  if (days === 0) return time;
+  if (days > 0 && days < 7) return `${format(d, "EEE")} ${time}`;
+  return format(d, "d MMM");
+}
+
+/** "in 3 hours", "in 2 days" */
+export function startsIn(date: string | Date) {
+  return formatDistanceToNowStrict(new Date(date), { addSuffix: true, roundingMethod: "floor" });
 }
 
 export function displayName(profile?: { display_name?: string | null; username?: string | null } | null) {

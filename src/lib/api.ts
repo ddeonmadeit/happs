@@ -68,9 +68,29 @@ export type MapHapp = {
   participantCount: number;
   isActive: boolean;
   iconUrl: string | null;
+  /** When it goes live; in the future for a scheduled happ. */
+  startsAt: string;
 };
 
-/** Happs created in the last 24 h with activity in the last 2 h. */
+/**
+ * When a happ goes live. The modern schema has `starts_at`; on the original
+ * backend a scheduled happ is stored with `created_at` set to its start.
+ */
+export function happStartsAt(happ: { starts_at?: string | null; created_at: string }) {
+  return happ.starts_at ?? happ.created_at;
+}
+
+/** A minute's grace, so a phone clock running slightly slow doesn't show a brand-new happ as "upcoming". */
+const CLOCK_SLACK_MS = 60_000;
+
+export function isUpcoming(startsAt: string, now = Date.now()) {
+  return Date.parse(startsAt) - now > CLOCK_SLACK_MS;
+}
+
+/**
+ * Happs created in the last 24 h with activity in the last 2 h, plus
+ * scheduled ones that haven't started yet (or started in the last 2 h).
+ */
 export async function fetchMapHapps(): Promise<MapHapp[]> {
   if (!(await isLegacy())) {
     const { data, error } = await supabase.rpc("get_map_happs");
@@ -85,6 +105,7 @@ export async function fetchMapHapps(): Promise<MapHapp[]> {
       participantCount: h.participant_count,
       isActive: h.is_active,
       iconUrl: h.icon_url,
+      startsAt: h.starts_at ?? h.created_at,
     }));
   }
 
@@ -92,7 +113,7 @@ export async function fetchMapHapps(): Promise<MapHapp[]> {
     .from("happs")
     .select("id, name, latitude, longitude, suburb, icon_url, is_active, participant_count, last_activity_at, created_at")
     .gt("created_at", iso(24 * 3600_000))
-    .gt("last_activity_at", iso(2 * 3600_000))
+    .or(`last_activity_at.gt.${iso(2 * 3600_000)},created_at.gt.${iso(2 * 3600_000)}`)
     .order("last_activity_at", { ascending: false })
     .limit(300);
   if (error) fail(error);
@@ -113,6 +134,7 @@ export async function fetchMapHapps(): Promise<MapHapp[]> {
     participantCount: h.participant_count ?? 0,
     isActive: h.is_active,
     iconUrl: h.icon_url,
+    startsAt: h.created_at,
   }));
 }
 
@@ -203,22 +225,70 @@ type NewHapp = {
   longitude: number;
   suburb: string;
   icon_url: string | null;
+  /** ISO time for a scheduled happ; null or past means now. */
+  starts_at: string | null;
 };
 
-export async function createHapp(happ: NewHapp, userId: string) {
+export async function createHapp({ starts_at, ...happ }: NewHapp, userId: string) {
   const legacy = await isLegacy();
+  const scheduled = starts_at && isUpcoming(starts_at) ? starts_at : null;
+  // The original backend has no starts_at: a scheduled happ is stored as
+  // "created" at its start time, with its activity clock starting then too.
+  const schedule = scheduled ? (legacy ? { created_at: scheduled, last_activity_at: scheduled } : { starts_at: scheduled }) : {};
   const { data, error } = await supabase
     .from("happs")
-    .insert({ ...happ, creator_id: userId, is_active: true, ...(legacy ? { participant_count: 1 } : {}) })
+    .insert({ ...happ, ...schedule, creator_id: userId, is_active: true })
     .select("id")
     .single();
   if (error) fail(error);
-  // The modern schema adds the creator as a participant in a trigger.
-  if (legacy) await supabase.from("happ_participants").insert({ happ_id: data.id, user_id: userId, is_active: true });
+  if (legacy) {
+    // The modern schema adds the creator as a participant in a trigger. The
+    // original one bumps the count and activity time when anyone joins
+    // (the old app also set the count to 1 up front, so every happ showed
+    // one person too many); set both straight afterwards.
+    await supabase.from("happ_participants").insert({ happ_id: data.id, user_id: userId, is_active: true });
+    const { count } = await supabase
+      .from("happ_participants")
+      .select("id", { count: "exact", head: true })
+      .eq("happ_id", data.id);
+    await supabase
+      .from("happs")
+      .update({ participant_count: count ?? 1, ...(scheduled ? { last_activity_at: scheduled } : {}) })
+      .eq("id", data.id);
+  }
   return data.id;
 }
 
-type NewPost = { happ_id: string; media_url: string; media_type: "image" | "video"; caption: string | null };
+/**
+ * Labels for posts.media_type. This schema uses "image"/"video", but the
+ * original backend's check constraint rejects "image" (every photo post in
+ * the old app failed silently), so we try the usual alternatives in turn and
+ * remember whichever the database accepts.
+ */
+const MEDIA_LABELS = {
+  image: ["image", "photo", "picture", "pic", "img"],
+  video: ["video", "clip", "movie", "vid"],
+} as const;
+const VIDEO_LABELS = new Set<string>(MEDIA_LABELS.video);
+const mediaLabelKey = (kind: MediaKind) => `happs:media-label:${kind}`;
+type MediaKind = keyof typeof MEDIA_LABELS;
+
+function mediaLabels(kind: MediaKind): string[] {
+  let saved: string | null = null;
+  try {
+    saved = localStorage.getItem(mediaLabelKey(kind));
+  } catch {
+    // storage unavailable
+  }
+  const all: readonly string[] = MEDIA_LABELS[kind];
+  return saved && all.includes(saved) ? [saved, ...all.filter((l) => l !== saved)] : [...all];
+}
+
+export function isVideoPost(post: { media_type: string; media_url: string }) {
+  return VIDEO_LABELS.has(post.media_type) || /\.(mp4|webm|mov|m4v)(\?|$)/i.test(post.media_url);
+}
+
+type NewPost = { happ_id: string; media_url: string; media_type: MediaKind; caption: string | null };
 
 export async function createPost(post: NewPost, userId: string) {
   const legacy = await isLegacy();
@@ -233,8 +303,24 @@ export async function createPost(post: NewPost, userId: string) {
     if (me) await supabase.from("happ_participants").update({ last_activity_at: iso(), is_active: true }).eq("id", me.id);
     else await supabase.from("happ_participants").insert({ happ_id: post.happ_id, user_id: userId, is_active: true });
   }
-  const { error } = await supabase.from("posts").insert({ ...post, user_id: userId });
-  if (error) fail(error);
+
+  let rejected = false;
+  for (const label of mediaLabels(post.media_type)) {
+    const { error } = await supabase.from("posts").insert({ ...post, media_type: label, user_id: userId });
+    if (!error) {
+      try {
+        localStorage.setItem(mediaLabelKey(post.media_type), label);
+      } catch {
+        // storage unavailable
+      }
+      rejected = false;
+      break;
+    }
+    // Anything but a media_type check failure is a real error.
+    if (!(error.code === "23514" && error.message.includes("media_type"))) fail(error);
+    rejected = true;
+  }
+  if (rejected) throw new Error(`The database wouldn’t accept this ${post.media_type === "video" ? "video" : "photo"}. Please try again.`);
   if (legacy) await supabase.from("happs").update({ last_activity_at: iso(), is_active: true }).eq("id", post.happ_id);
 }
 

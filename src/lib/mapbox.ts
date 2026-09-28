@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { MAP_BOUNDS } from "@/lib/constants";
 
 let tokenPromise: Promise<string | null> | null = null;
 
@@ -44,5 +45,52 @@ export async function reverseGeocode(latitude: number, longitude: number): Promi
     return tail ? `${feature.text}, ${tail}` : feature.text;
   } catch {
     return null;
+  }
+}
+
+export type Place = { id: string; name: string; address: string; latitude: number; longitude: number };
+
+type SearchFeature = {
+  properties: {
+    mapbox_id: string;
+    name: string;
+    full_address?: string;
+    place_formatted?: string;
+    coordinates: { latitude: number; longitude: number };
+  };
+};
+
+/**
+ * Venues, places and addresses in Greater Sydney matching `query`, nearest
+ * to `near` first (Mapbox Search Box: it knows venues like "Opera House",
+ * which the older geocoding API doesn't).
+ */
+export async function searchPlaces(query: string, near?: { latitude: number; longitude: number } | null): Promise<Place[]> {
+  const token = await getMapboxToken();
+  const q = query.trim();
+  if (!token || q.length < 2) return [];
+  const params = new URLSearchParams({
+    q,
+    access_token: token,
+    country: "au",
+    bbox: MAP_BOUNDS.flat().join(","),
+    types: "poi,address,street,neighborhood,locality,place,postcode",
+    language: "en",
+    limit: "6",
+  });
+  if (near) params.set("proximity", `${near.longitude},${near.latitude}`);
+  try {
+    const res = await fetch(`https://api.mapbox.com/search/searchbox/v1/forward?${params}`);
+    if (!res.ok) return [];
+    const features: SearchFeature[] = (await res.json()).features ?? [];
+    return features.map(({ properties: p }) => ({
+      id: p.mapbox_id,
+      name: p.name,
+      address: (p.full_address && p.full_address !== p.name ? p.full_address : (p.place_formatted ?? "")).replace(/, Australia$/, ""),
+      latitude: p.coordinates.latitude,
+      longitude: p.coordinates.longitude,
+    }));
+  } catch {
+    return [];
   }
 }

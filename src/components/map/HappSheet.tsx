@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { Camera, Users } from "lucide-react";
+import { CalendarClock, Camera, Clock, Users } from "lucide-react";
 import type { HappRow } from "@/integrations/supabase/types";
-import { fetchHapp, fetchParticipants, type Participant } from "@/lib/api";
+import { fetchHapp, fetchParticipants, happStartsAt, isUpcoming, type Participant } from "@/lib/api";
 import { useRealtime } from "@/hooks/useRealtime";
+import { useNow } from "@/hooks/useNow";
 import { Sheet } from "@/components/ui/Sheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Pressable, spring, Stagger, StaggerItem } from "@/components/motion";
 import { draftStore } from "@/lib/draft";
-import { cn, shortTimeAgo } from "@/lib/utils";
+import { cn, formatStart, shortTimeAgo, startsIn } from "@/lib/utils";
 
 type Props = {
   happId: string | null;
@@ -43,7 +44,10 @@ export function HappSheet({ happId, onClose, onLoaded }: Props) {
 
   useRealtime(happId ? [{ table: "happ_participants", filter: `happ_id=eq.${happId}` }] : null, load);
 
+  const now = useNow();
   const storytellers = (people ?? []).filter((p) => p.hasPosts);
+  const startsAt = happ ? happStartsAt(happ) : null;
+  const upcoming = startsAt ? isUpcoming(startsAt, now) : false;
 
   const joinAndPost = () => {
     if (!happ) return;
@@ -86,21 +90,38 @@ export function HappSheet({ happId, onClose, onLoaded }: Props) {
             <div className="min-w-0 flex-1">
               <h2 className="truncate text-[22px] font-extrabold leading-tight tracking-tight">{happ.name}</h2>
               <div className="mt-1 flex items-center gap-2 text-sm">
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide",
-                    happ.is_active ? "bg-accent/15 text-accent" : "bg-dead/15 text-dead",
-                  )}
-                >
-                  <span className={cn("h-1.5 w-1.5 rounded-full", happ.is_active ? "animate-pulse bg-accent" : "bg-dead")} />
-                  {happ.is_active ? "Live" : "Dead"}
-                </span>
+                {upcoming ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-cream/10 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-cream">
+                    <Clock className="h-3 w-3" strokeWidth={3} />
+                    Upcoming
+                  </span>
+                ) : (
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide",
+                      happ.is_active ? "bg-accent/15 text-accent" : "bg-dead/15 text-dead",
+                    )}
+                  >
+                    <span className={cn("h-1.5 w-1.5 rounded-full", happ.is_active ? "animate-pulse bg-accent" : "bg-dead")} />
+                    {happ.is_active ? "Live" : "Dead"}
+                  </span>
+                )}
                 {happ.suburb && <span className="truncate text-muted-foreground">{happ.suburb}</span>}
               </div>
             </div>
           </div>
 
           {happ.description && <p className="text-[15px] leading-relaxed text-foreground/80">{happ.description}</p>}
+
+          {upcoming && startsAt && (
+            <div className="flex items-center gap-3 rounded-3xl bg-muted/60 px-4 py-3">
+              <CalendarClock className="h-5 w-5 shrink-0 text-accent" />
+              <p className="min-w-0 flex-1 text-sm">
+                <span className="font-bold">Goes live {formatStart(startsAt)}</span>
+                <span className="text-muted-foreground"> · {startsIn(startsAt)}</span>
+              </p>
+            </div>
+          )}
 
           {storytellers.length > 0 && (
             <section>
@@ -150,15 +171,23 @@ export function HappSheet({ happId, onClose, onLoaded }: Props) {
             <p className="min-w-0 flex-1 text-sm">
               <span className="font-bold">{people?.length ?? 0}</span>{" "}
               <span className="text-muted-foreground">
-                {people?.length === 1 ? "person" : "people"} here
+                {people?.length === 1 ? "person" : "people"} {upcoming ? "going" : "here"}
               </span>
             </p>
-            <span className="shrink-0 text-xs font-semibold text-muted-foreground">{shortTimeAgo(happ.last_activity_at)} ago</span>
+            {!upcoming && (
+              <span className="shrink-0 text-xs font-semibold text-muted-foreground">{shortTimeAgo(happ.last_activity_at)} ago</span>
+            )}
           </div>
 
-          <Button size="lg" className="w-full" onClick={joinAndPost}>
-            <Camera className="h-5 w-5" strokeWidth={2.5} /> Join & post
-          </Button>
+          {upcoming && startsAt ? (
+            <div className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-muted text-base font-bold text-muted-foreground">
+              <Clock className="h-5 w-5" strokeWidth={2.5} /> Stories open {startsIn(startsAt)}
+            </div>
+          ) : (
+            <Button size="lg" className="w-full" onClick={joinAndPost}>
+              <Camera className="h-5 w-5" strokeWidth={2.5} /> Join & post
+            </Button>
+          )}
         </div>
       )}
     </Sheet>

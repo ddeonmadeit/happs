@@ -4,7 +4,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { MapPinOff } from "lucide-react";
 import { getMapboxToken } from "@/lib/mapbox";
 import { MAP_BOUNDS, MAP_CENTER, MAP_STYLE } from "@/lib/constants";
-import type { MapHapp } from "@/lib/api";
+import { isUpcoming, type MapHapp } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 type LngLatLike = { latitude: number; longitude: number };
@@ -19,6 +19,8 @@ type HappMapProps = {
   selectedId?: string | null;
   onHappClick: (id: string) => void;
   userLocation?: LngLatLike | null;
+  /** Current time; scheduled happs show faded until they start. */
+  now: number;
   className?: string;
 };
 
@@ -26,9 +28,13 @@ function markerSize(postCount: number) {
   return 44 + Math.min(postCount / 3, 6) * 7;
 }
 
-function renderMarker(inner: HTMLElement, happ: MapHapp, selected: boolean) {
+function renderMarker(inner: HTMLElement, happ: MapHapp, selected: boolean, upcoming: boolean) {
   const size = markerSize(happ.postCount);
-  inner.className = cn("happ-marker", !happ.isActive && "is-dead", selected && "is-selected");
+  inner.className = cn(
+    "happ-marker",
+    upcoming ? "is-upcoming" : !happ.isActive && "is-dead",
+    selected && "is-selected",
+  );
   inner.style.width = `${size}px`;
   inner.style.height = `${size}px`;
   inner.replaceChildren();
@@ -47,7 +53,7 @@ function renderMarker(inner: HTMLElement, happ: MapHapp, selected: boolean) {
 }
 
 export const HappMap = forwardRef<HappMapHandle, HappMapProps>(
-  ({ happs, selectedId, onHappClick, userLocation, className }, ref) => {
+  ({ happs, selectedId, onHappClick, userLocation, now, className }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<mapboxgl.Map | null>(null);
     const markersRef = useRef(new Map<string, { marker: mapboxgl.Marker; key: string }>());
@@ -58,10 +64,17 @@ export const HappMap = forwardRef<HappMapHandle, HappMapProps>(
     const [ready, setReady] = useState(false);
     const [failed, setFailed] = useState(false);
 
+    // A fly requested before the map is ready (e.g. opening a happ link) runs once it loads.
+    const pendingFly = useRef<Parameters<HappMapHandle["flyTo"]> | null>(null);
+
     useImperativeHandle(ref, () => ({
       flyTo: (at, opts) => {
         const map = mapRef.current;
-        if (!map) return;
+        if (!map || !map.loaded()) {
+          pendingFly.current = [at, opts];
+          centeredOnUser.current = true;
+          return;
+        }
         map.flyTo({
           center: [at.longitude, at.latitude],
           zoom: opts?.zoom ?? Math.max(map.getZoom(), 15),
@@ -100,7 +113,19 @@ export const HappMap = forwardRef<HappMapHandle, HappMapProps>(
         });
         map.touchZoomRotate.disableRotation();
         map.on("load", () => {
-          if (!cancelled) setReady(true);
+          if (cancelled) return;
+          setReady(true);
+          const pending = pendingFly.current;
+          pendingFly.current = null;
+          if (pending) {
+            const [at, opts] = pending;
+            map.easeTo({
+              center: [at.longitude, at.latitude],
+              zoom: opts?.zoom ?? 15,
+              offset: [0, -(opts?.offsetY ?? 0)],
+              duration: 0,
+            });
+          }
         });
         map.on("error", (e) => console.warn("Map error:", e.error?.message));
         mapRef.current = map;
@@ -146,13 +171,14 @@ export const HappMap = forwardRef<HappMapHandle, HappMapProps>(
       for (const happ of happs) {
         seen.add(happ.id);
         const selected = happ.id === selectedId;
-        const key = `${happ.name}|${happ.iconUrl}|${happ.isActive}|${markerSize(happ.postCount)}|${selected}`;
+        const upcoming = isUpcoming(happ.startsAt, now);
+        const key = `${happ.name}|${happ.iconUrl}|${happ.isActive}|${markerSize(happ.postCount)}|${selected}|${upcoming}`;
         let entry = existing.get(happ.id);
         if (entry) {
           entry.marker.setLngLat([happ.longitude, happ.latitude]);
           if (entry.key !== key) {
             const inner = entry.marker.getElement().firstElementChild as HTMLElement | null;
-            if (inner) renderMarker(inner, happ, selected);
+            if (inner) renderMarker(inner, happ, selected, upcoming);
             entry.key = key;
           }
         } else {
@@ -165,7 +191,7 @@ export const HappMap = forwardRef<HappMapHandle, HappMapProps>(
             clickRef.current(happ.id);
           });
           outer.appendChild(inner);
-          renderMarker(inner, happ, selected);
+          renderMarker(inner, happ, selected, upcoming);
           const marker = new mapboxgl.Marker({ element: outer }).setLngLat([happ.longitude, happ.latitude]).addTo(map);
           entry = { marker, key };
           existing.set(happ.id, entry);
@@ -179,7 +205,7 @@ export const HappMap = forwardRef<HappMapHandle, HappMapProps>(
           existing.delete(id);
         }
       }
-    }, [happs, ready, selectedId]);
+    }, [happs, ready, selectedId, now]);
 
     return (
       <div className={cn("relative h-full w-full bg-app", className)}>

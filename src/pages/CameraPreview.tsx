@@ -69,9 +69,12 @@ export default function CameraPreview() {
             longitude: target.happ.longitude,
             suburb: target.happ.suburb,
             icon_url: iconUrl,
+            starts_at: target.happ.startsAt,
           },
           user.id,
         );
+        // If the post below fails, "try again" posts to this happ rather than making another.
+        draftStore.happCreated(happId);
       }
 
       setStatus("Posting…");
@@ -80,10 +83,11 @@ export default function CameraPreview() {
         user.id,
       );
 
-      if (target.kind === "new") requestPush({ type: "happ", happ_id: happId });
+      const isNew = target.kind === "new" || target.justCreated;
+      if (isNew) requestPush({ type: "happ", happ_id: happId });
 
       done.current = true;
-      toast.success(target.kind === "new" ? "Your happ is live!" : "Posted!");
+      toast.success(isNew ? "Your happ is live!" : "Posted!");
       navigate(`/happ/${happId}`, { replace: true });
       draftStore.clear();
     } catch (err) {
@@ -98,7 +102,7 @@ export default function CameraPreview() {
   return (
     <Screen>
       <TopBar
-        title={target.kind === "new" ? "New happ" : "New post"}
+        title={target.kind === "new" || target.justCreated ? "New happ" : "New post"}
         onBack={retake}
         right={
           <Button variant="ghost" size="sm" onClick={retake} disabled={busy} className="px-3">
@@ -167,7 +171,7 @@ export default function CameraPreview() {
 
         <div className="mt-auto pt-2">
           <Button size="lg" className="w-full" onClick={post} disabled={busy}>
-            {busy ? status : target.kind === "new" ? "Create happ & post" : "Post"}
+            {busy ? status : target.kind === "new" ? "Create happ & post" : target.justCreated ? "Try posting again" : "Post"}
           </Button>
         </div>
       </main>

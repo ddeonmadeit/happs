@@ -16,6 +16,7 @@ import {
   fetchHapp,
   fetchProfiles,
   fetchStory,
+  isVideoPost,
   setLike,
   type CommentWithProfile,
   type ProfileLite,
@@ -160,7 +161,7 @@ export default function Story() {
             className="absolute inset-0 flex items-center justify-center"
             onDoubleClick={() => !post.isLiked && toggleLike()}
           >
-            {post.media_type === "video" ? (
+            {isVideoPost(post) ? (
               <video src={post.media_url} className="h-full w-full object-contain" autoPlay playsInline loop muted={muted} />
             ) : (
               <img src={post.media_url} alt={post.caption ?? "Post"} className="h-full w-full object-contain" draggable={false} />
@@ -213,7 +214,7 @@ export default function Story() {
               </span>
             </span>
           </Link>
-          {post.media_type === "video" && (
+          {isVideoPost(post) && (
             <IconButton label={muted ? "Unmute" : "Mute"} className="bg-white/15 text-white backdrop-blur-md" onClick={() => setMuted((m) => !m)}>
               {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
             </IconButton>

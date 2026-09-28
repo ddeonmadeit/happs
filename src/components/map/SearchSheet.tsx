@@ -2,14 +2,22 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MapPin, Search, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import type { MapHapp } from "@/lib/api";
+import { backendMode, happStartsAt, isUpcoming, type MapHapp } from "@/lib/api";
 import { Sheet } from "@/components/ui/Sheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { Spinner } from "@/components/ui/Spinner";
 import { Pressable, Stagger, StaggerItem } from "@/components/motion";
-import { cn, distanceMeters, toSearchPattern } from "@/lib/utils";
+import { cn, distanceMeters, shortStart, toSearchPattern } from "@/lib/utils";
 
-type Result = { type: "user" | "happ"; id: string; title: string; subtitle: string | null; avatar: string | null; live?: boolean };
+type Result = {
+  type: "user" | "happ";
+  id: string;
+  title: string;
+  subtitle: string | null;
+  avatar: string | null;
+  live?: boolean;
+  startsAt?: string;
+};
 
 type Props = {
   open: boolean;
@@ -17,13 +25,24 @@ type Props = {
   /** Happs currently on the map, shown when the search box is empty. */
   happs: MapHapp[];
   location: { latitude: number; longitude: number } | null;
+  now: number;
+};
+
+type HappHit = {
+  id: string;
+  name: string;
+  suburb: string | null;
+  icon_url: string | null;
+  is_active: boolean;
+  created_at: string;
+  starts_at?: string;
 };
 
 function formatDistance(m: number) {
   return m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`;
 }
 
-export function SearchSheet({ open, onClose, happs, location }: Props) {
+export function SearchSheet({ open, onClose, happs, location, now }: Props) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Result[]>([]);
@@ -49,6 +68,8 @@ export function SearchSheet({ open, onClose, happs, location }: Props) {
     let cancelled = false;
     const t = setTimeout(async () => {
       const quoted = `"${pattern}"`;
+      // Only the modern schema has starts_at (the original stores it in created_at).
+      const happColumns = `id, name, suburb, icon_url, is_active, created_at${(await backendMode()) === "modern" ? ", starts_at" : ""}`;
       const [users, found] = await Promise.all([
         supabase
           .from("profiles")
@@ -58,20 +79,21 @@ export function SearchSheet({ open, onClose, happs, location }: Props) {
           .limit(6),
         supabase
           .from("happs")
-          .select("id, name, suburb, icon_url, is_active")
+          .select(happColumns)
           .or(`name.ilike.${quoted},suburb.ilike.${quoted}`)
           .order("last_activity_at", { ascending: false })
           .limit(6),
       ]);
       if (cancelled) return;
       setResults([
-        ...(found.data ?? []).map<Result>((h) => ({
+        ...((found.data ?? []) as unknown as HappHit[]).map<Result>((h) => ({
           type: "happ",
           id: h.id,
           title: h.name,
           subtitle: h.suburb,
           avatar: h.icon_url,
           live: h.is_active,
+          startsAt: happStartsAt(h),
         })),
         ...(users.data ?? []).map<Result>((u) => ({
           type: "user",
@@ -89,14 +111,23 @@ export function SearchSheet({ open, onClose, happs, location }: Props) {
     };
   }, [query]);
 
-  // Empty state: what's on right now, nearest first.
-  const happeningNow = useMemo(() => {
+  // Empty state: what's on right now (nearest first), then what's coming up (soonest first).
+  const { happeningNow, comingUp } = useMemo(() => {
     const list = happs.map((h) => ({
       ...h,
       distance: location ? distanceMeters(location.latitude, location.longitude, h.latitude, h.longitude) : null,
     }));
-    return list.sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0)).slice(0, 8);
-  }, [happs, location]);
+    return {
+      happeningNow: list
+        .filter((h) => !isUpcoming(h.startsAt, now))
+        .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0))
+        .slice(0, 8),
+      comingUp: list
+        .filter((h) => isUpcoming(h.startsAt, now))
+        .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+        .slice(0, 8),
+    };
+  }, [happs, location, now]);
 
   const go = (r: { type: "user" | "happ"; id: string }) => {
     onClose();
@@ -152,8 +183,16 @@ export function SearchSheet({ open, onClose, happs, location }: Props) {
                   avatar={r.avatar}
                   title={r.title}
                   subtitle={r.subtitle}
-                  badge={r.type === "user" ? "Person" : r.live ? "Live" : "Ended"}
-                  accent={r.type === "happ" && r.live}
+                  badge={
+                    r.type === "user"
+                      ? "Person"
+                      : r.startsAt && isUpcoming(r.startsAt, now)
+                        ? shortStart(r.startsAt)
+                        : r.live
+                          ? "Live"
+                          : "Ended"
+                  }
+                  accent={r.type === "happ" && r.live && !(r.startsAt && isUpcoming(r.startsAt, now))}
                   round={r.type === "user"}
                 />
               </StaggerItem>
@@ -183,6 +222,24 @@ export function SearchSheet({ open, onClose, happs, location }: Props) {
                 </StaggerItem>
               ))}
             </Stagger>
+          )}
+          {comingUp.length > 0 && (
+            <>
+              <h3 className="mb-2 mt-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Coming up</h3>
+              <Stagger className="space-y-1 pb-4">
+                {comingUp.map((h) => (
+                  <StaggerItem key={h.id}>
+                    <Row
+                      onClick={() => go({ type: "happ", id: h.id })}
+                      avatar={h.iconUrl}
+                      title={h.name}
+                      subtitle={[h.suburb, h.distance != null ? formatDistance(h.distance) : null].filter(Boolean).join(" · ")}
+                      badge={shortStart(h.startsAt)}
+                    />
+                  </StaggerItem>
+                ))}
+              </Stagger>
+            </>
           )}
         </>
       )}

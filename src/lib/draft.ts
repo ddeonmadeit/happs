@@ -14,12 +14,14 @@ export type NewHappDetails = {
   latitude: number;
   longitude: number;
   suburb: string;
+  /** ISO start time for a scheduled happ; null means it starts now. */
+  startsAt: string | null;
   icon: Blob;
   iconPreview: string;
 };
 
 export type DraftTarget =
-  | { kind: "existing"; happId: string; happName: string }
+  | { kind: "existing"; happId: string; happName: string; justCreated?: boolean }
   | { kind: "new"; happ: NewHappDetails };
 
 export type CapturedMedia = {
@@ -52,6 +54,16 @@ export const draftStore = {
     const newIcon = target.kind === "new" ? target.happ.iconPreview : null;
     if (oldIcon && oldIcon !== newIcon) URL.revokeObjectURL(oldIcon);
     emit({ target, media: null });
+  },
+  /**
+   * The new happ now exists. If posting to it fails, a retry posts to this
+   * happ instead of creating a duplicate.
+   */
+  happCreated(happId: string) {
+    const target = draft.target;
+    if (target?.kind !== "new") return;
+    URL.revokeObjectURL(target.happ.iconPreview);
+    emit({ ...draft, target: { kind: "existing", happId, happName: target.happ.name, justCreated: true } });
   },
   setMedia(media: CapturedMedia) {
     if (draft.media) URL.revokeObjectURL(draft.media.previewUrl);
