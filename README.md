@@ -197,10 +197,11 @@ and `MAP_CENTER` in `src/lib/constants.ts` to open it up.
 - **Map markers** glow in the main colour of each happ's picture. Where happs
   overlap, tapping the stack fans them out with their names so you can pick
   one.
-- **Waze-style map screen:** your avatar top-left and messages top-right; a
-  big orange **+** to start a happ; a search pill at the bottom. A "You're
-  here" card with **Post** and **DH** springs up only when you're actually at a
-  happ.
+- **Waze-style map screen:** your avatar and messages stacked in the top-right
+  corner; a big **+** to start a happ at the bottom centre, above the search
+  pill. A "You're here" card with **Post** and **DH** springs up between them
+  only when you're actually at a happ, and a "back to me" button appears once
+  you pan away from yourself.
 - **Happs open as a card over the map** (`/happ/:id`), with the story ring,
   who's there, and Join & post. Search opens as a sheet listing what's on
   nearest to you, then what's coming up.

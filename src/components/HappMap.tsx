@@ -20,6 +20,8 @@ type HappMapProps = {
   selectedId?: string | null;
   onHappClick: (id: string) => void;
   userLocation?: LngLatLike | null;
+  /** Whether the map is (roughly) centred on you, reported as it moves. */
+  onCenteredChange?: (centered: boolean) => void;
   /** Current time; scheduled happs show faded until they start. */
   now: number;
   className?: string;
@@ -40,8 +42,8 @@ type MarkerEntry = {
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 /** Room taken by the floating controls at the top and bottom of the map. */
-const SAFE_TOP = 110;
-const SAFE_BOTTOM = 230;
+const SAFE_TOP = 150;
+const SAFE_BOTTOM = 250;
 
 function markerSize(postCount: number) {
   return 44 + Math.min(postCount / 3, 6) * 7;
@@ -84,7 +86,7 @@ function renderMarker(entry: MarkerEntry, selected: boolean, upcoming: boolean) 
 }
 
 export const HappMap = forwardRef<HappMapHandle, HappMapProps>(
-  ({ happs, selectedId, onHappClick, userLocation, now, className }, ref) => {
+  ({ happs, selectedId, onHappClick, userLocation, onCenteredChange, now, className }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<mapboxgl.Map | null>(null);
     const markersRef = useRef(new Map<string, MarkerEntry>());
@@ -97,6 +99,20 @@ export const HappMap = forwardRef<HappMapHandle, HappMapProps>(
     const centeredOnUser = useRef(false);
     const clickRef = useRef(onHappClick);
     clickRef.current = onHappClick;
+    const userLocationRef = useRef(userLocation);
+    userLocationRef.current = userLocation;
+    const centeredChangeRef = useRef(onCenteredChange);
+    centeredChangeRef.current = onCenteredChange;
+
+    /** Tell the parent whether your location is near the middle of the map. */
+    const reportCentered = () => {
+      const map = mapRef.current;
+      const at = userLocationRef.current;
+      if (!map || !at) return;
+      const p = map.project([at.longitude, at.latitude]);
+      const { width, height } = map.getContainer().getBoundingClientRect();
+      centeredChangeRef.current?.(Math.hypot(p.x - width / 2, p.y - height / 2) < 90);
+    };
     const [ready, setReady] = useState(false);
     const [failed, setFailed] = useState(false);
 
@@ -273,6 +289,7 @@ export const HappMap = forwardRef<HappMapHandle, HappMapProps>(
         map.on("movestart", () => {
           if (!centeringRef.current) collapse();
         });
+        map.on("moveend", reportCentered);
         map.on("click", (e) => {
           const target = e.originalEvent.target as Element | null;
           if (!target?.closest(".mapboxgl-marker")) collapse();
@@ -324,6 +341,8 @@ export const HappMap = forwardRef<HappMapHandle, HappMapProps>(
       if (!centeredOnUser.current) {
         centeredOnUser.current = true;
         map.flyTo({ center: lngLat, zoom: 15, speed: 1.2, essential: true });
+      } else {
+        reportCentered();
       }
     }, [userLocation, ready]);
 

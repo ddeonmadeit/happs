@@ -48,7 +48,9 @@ export default function MapPage({ active }: { active: boolean }) {
   const { user, profile } = useAuth();
   const { updateLocation } = usePush();
   const unread = useUnreadCount();
-  const { location, refresh } = useGeolocation({ watch: true });
+  const { location, error: locationError, refresh } = useGeolocation({ watch: true });
+  const [centeredOnMe, setCenteredOnMe] = useState(true);
+  const showLocate = location ? !centeredOnMe : Boolean(locationError);
   const mapRef = useRef<HappMapHandle>(null);
   const closeHapp = useGoBack("/map");
 
@@ -149,13 +151,14 @@ export default function MapPage({ active }: { active: boolean }) {
         happs={happs}
         selectedId={selectedId}
         userLocation={location}
+        onCenteredChange={setCenteredOnMe}
         now={now}
         onHappClick={(id) => navigate(`/happ/${id}`, { replace: Boolean(selectedId) })}
         className="absolute inset-0"
       />
 
-      {/* Top: you, and your messages */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between px-4 pt-safe">
+      {/* Top right: you, and your messages */}
+      <div className="pointer-events-none absolute right-0 top-0 z-30 flex flex-col items-center gap-3 px-4 pt-safe">
         <motion.button
           type="button"
           aria-label="Your profile"
@@ -203,19 +206,28 @@ export default function MapPage({ active }: { active: boolean }) {
         </motion.div>
       </div>
 
-      {/* Bottom: actions, the "you're here" card and search */}
+      {/* Bottom: create (centre), the "you're here" card and search */}
       <div className="pointer-events-none absolute inset-x-0 bottom-safe z-30 mx-auto flex max-w-lg flex-col gap-3 px-4">
-        <div className="flex items-end justify-between">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ ...spring.bouncy, delay: 0.2 }}
-            className="pointer-events-auto"
-          >
-            <IconButton label="Show my location" variant="glass" size="lg" onClick={recenter}>
-              <LocateFixed className="h-6 w-6" strokeWidth={2.2} />
-            </IconButton>
-          </motion.div>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-end">
+          {/* Back to you: only shown once you've panned away (or location failed). */}
+          <div className="flex justify-start">
+            <AnimatePresence>
+              {showLocate && (
+                <motion.div
+                  key="locate"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0, opacity: 0, transition: { duration: 0.15 } }}
+                  transition={spring.bouncy}
+                  className="pointer-events-auto"
+                >
+                  <IconButton label="Show my location" variant="glass" size="lg" onClick={recenter}>
+                    <LocateFixed className="h-6 w-6" strokeWidth={2.2} />
+                  </IconButton>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           <motion.button
             type="button"
@@ -225,10 +237,11 @@ export default function MapPage({ active }: { active: boolean }) {
             animate={{ scale: 1, rotate: 0 }}
             whileTap={{ scale: 0.86, rotate: 45 }}
             transition={{ ...spring.bouncy, delay: 0.25 }}
-            className="glitch-bg pointer-events-auto flex h-[68px] w-[68px] items-center justify-center rounded-full text-accent-foreground shadow-[0_10px_30px_-6px_hsl(var(--accent)/0.7)]"
+            className="glitch-bg pointer-events-auto flex h-[72px] w-[72px] items-center justify-center rounded-full text-accent-foreground shadow-[0_10px_30px_-6px_hsl(var(--accent)/0.7)]"
           >
             <HappsMark className="h-9 w-9" />
           </motion.button>
+          <div />
         </div>
 
         <div className="pointer-events-auto empty:hidden">
