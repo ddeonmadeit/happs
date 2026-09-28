@@ -33,7 +33,7 @@
     --ring: 29 84% 53%;
     --radius: 1.25rem;
     --marker-active: 29 84% 53%;
-    --marker-inactive: 0 72% 58%;
+    --marker-inactive: 10 78% 47%; /* #d53a1a — Dead Happs and the DH button */
     color-scheme: dark;
   }
 

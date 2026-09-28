@@ -166,7 +166,7 @@ export default function MapPage({ active }: { active: boolean }) {
           transition={{ ...spring.bouncy, delay: 0.1 }}
           className={cn(
             "glass pointer-events-auto flex items-center justify-center rounded-full p-1",
-            dhPressed && "ring-[3px] ring-accent",
+            dhPressed && "ring-[3px] ring-dead",
           )}
         >
           <Avatar src={profile?.avatar_url} name={profile?.display_name || profile?.username} size="h-11 w-11" />
@@ -273,10 +273,12 @@ export default function MapPage({ active }: { active: boolean }) {
                 aria-pressed={dhPressed}
                 className={cn(
                   "flex h-11 w-12 shrink-0 items-center justify-center rounded-full text-[15px] font-black tracking-tight",
-                  dhPressed ? "glitch-bg text-accent-foreground" : "bg-white/[0.07] ring-1 ring-inset ring-white/[0.06]",
+                  dhPressed
+                    ? "bg-dead text-cream shadow-[0_6px_18px_-6px_hsl(var(--marker-inactive)/0.8)]"
+                    : "bg-dead/15 text-dead ring-1 ring-inset ring-dead/30",
                 )}
               >
-                <span className={cn(!dhPressed && "glitch-text")}>DH</span>
+                DH
               </motion.button>
             </motion.div>
           )}
@@ -325,7 +327,12 @@ export default function MapPage({ active }: { active: boolean }) {
           <Button variant="secondary" className="flex-1" onClick={() => setConfirmOpen(false)}>
             Cancel
           </Button>
-          <Button className="flex-1" loading={voting} onClick={toggleVote}>
+          <Button
+            variant={dhPressed ? "accent" : "destructive"}
+            className={cn("flex-1", !dhPressed && "bg-dead text-cream shadow-[0_6px_20px_-6px_hsl(var(--marker-inactive)/0.6)]")}
+            loading={voting}
+            onClick={toggleVote}
+          >
             {dhPressed ? "Take back" : "It’s dead"}
           </Button>
         </div>
