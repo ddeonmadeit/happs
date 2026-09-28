@@ -176,10 +176,10 @@ function PickerBody({ initial, onClose, onPick, locate }: Omit<Props, "open">) {
           transition={spring.bouncy}
           className="absolute -left-[22px] -top-[58px] flex flex-col items-center"
         >
-          <span className="glitch-bg flex h-11 w-11 items-center justify-center rounded-full shadow-[0_10px_24px_-6px_rgb(0_0_0/0.7)] ring-[3px] ring-[#1d1b18]">
-            <span className="h-3.5 w-3.5 rounded-full bg-[#1d1b18]" />
+          <span className="glitch-bg flex h-11 w-11 items-center justify-center rounded-full shadow-[0_10px_24px_-6px_rgb(0_0_0/0.7)] ring-[3px] ring-background">
+            <span className="h-3.5 w-3.5 rounded-full bg-background" />
           </span>
-          <span className="-mt-0.5 h-4 w-[3px] rounded-b-full bg-[#1d1b18]" />
+          <span className="-mt-0.5 h-4 w-[3px] rounded-b-full bg-background" />
         </motion.div>
       </div>
 

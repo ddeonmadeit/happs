@@ -8,7 +8,7 @@ import path from "node:path";
 // from BASE_PATH (set in the deploy workflow). Locally it's just "/".
 const base = process.env.BASE_PATH ?? "/";
 
-const BACKGROUND = "#1d1b18";
+const BACKGROUND = "#13110f";
 
 /**
  * GitHub Pages has no SPA rewrites. Serving index.html as 404.html lets deep

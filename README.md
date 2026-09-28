@@ -185,14 +185,18 @@ and `MAP_CENTER` in `src/lib/constants.ts` to open it up.
 
 ### Design
 
-- **One theme:** warm dark charcoal (`#1d1b18`) that deepens into an ombré,
-  with film grain, and orange highlights (`#e44d18`). Red is used only for
-  Dead Happs.
-- **Living brand texture:** the wordmark, logo and orange buttons use the
-  glitch-art texture (`public/textures/`). Yellow, red and amber blobs drift
-  slowly through it, and a hot spot follows your finger when you slide it
-  across (`src/lib/glitch.ts`). Text and the logo use a cut of the texture
-  with no black in it.
+- **One theme:** deep warm charcoal (`#13110f`) that darkens into an ombré,
+  with film grain, and Tarantino amber/gold highlights (`#ec8423`). Red is
+  used only for Dead Happs.
+- **Living brand texture:** the wordmark and buttons use a soft, golden
+  glitch-art texture (`public/textures/gold.webp`). Gold, burnt-orange and
+  amber blobs drift slowly through it, the streak lines in text slide past
+  each other, and a hot spot follows your finger when you slide it across
+  (`src/lib/glitch.ts`). The logo mark is a plain gold gradient with the same
+  moving colour.
+- **Map markers** glow in the main colour of each happ's picture. Where happs
+  overlap, tapping the stack fans them out with their names so you can pick
+  one.
 - **Waze-style map screen:** your avatar top-left and messages top-right; a
   big orange **+** to start a happ; a search pill at the bottom. A "You're
   here" card with **Post** and **DH** springs up only when you're actually at a
@@ -205,6 +209,9 @@ and `MAP_CENTER` in `src/lib/constants.ts` to open it up.
   for stories when they begin.
 - **Put it anywhere:** the happ's location defaults to where you are; tap it to
   drag a pin on a map or search for a venue or address.
+- **Delete your happs:** the creator gets a delete button on the happ's card.
+  (On the original backend, if the database refuses the delete because other
+  people have joined, the happ is ended and taken off the map instead.)
 - **Springs everywhere:** buttons squish when pressed, sheets spring up and
   swipe down to close, markers drop in with a bounce, screens slide over the
   map and away again, stories swipe left/right and down to close, tabs slide,

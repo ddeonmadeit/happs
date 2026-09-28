@@ -299,7 +299,15 @@ export default function MapPage({ active }: { active: boolean }) {
         </motion.button>
       </div>
 
-      <HappSheet happId={selectedId} onClose={closeHapp} onLoaded={onHappLoaded} />
+      <HappSheet
+        happId={selectedId}
+        onClose={closeHapp}
+        onLoaded={onHappLoaded}
+        onDeleted={(id) => {
+          setHapps((list) => list.filter((h) => h.id !== id));
+          loadHapps();
+        }}
+      />
       <SearchSheet open={searchOpen && active} onClose={() => setSearchOpen(false)} happs={happs} location={location} now={now} />
 
       <Sheet

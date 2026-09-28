@@ -260,6 +260,36 @@ export async function createHapp({ starts_at, ...happ }: NewHapp, userId: string
 }
 
 /**
+ * Delete a happ you created (its stories go with it). Returns "hidden" if the
+ * original backend refuses the delete, e.g. because other people have joined
+ * and it has no cascading deletes: the happ is then ended and taken off the
+ * map instead.
+ */
+export async function deleteHapp(happId: string, userId: string): Promise<"deleted" | "hidden"> {
+  const attempt = () => supabase.from("happs").delete().eq("id", happId).eq("creator_id", userId).select("id");
+  let { data, error } = await attempt();
+  if (!error && data?.length) return "deleted";
+  if (!(await isLegacy())) fail(error ?? new Error("You can only delete happs you created"));
+
+  // Clear what's ours first, then try again.
+  await supabase.from("posts").delete().eq("happ_id", happId).eq("user_id", userId);
+  await supabase.from("happ_participants").delete().eq("happ_id", happId).eq("user_id", userId);
+  ({ data, error } = await attempt());
+  if (!error && data?.length) return "deleted";
+
+  // Still blocked: end it and move it out of the map's time window.
+  const past = iso(3 * 24 * 3600_000);
+  const { data: hidden, error: hideError } = await supabase
+    .from("happs")
+    .update({ is_active: false, created_at: past, last_activity_at: past })
+    .eq("id", happId)
+    .eq("creator_id", userId)
+    .select("id");
+  if (!hideError && hidden?.length) return "hidden";
+  fail(hideError ?? error ?? new Error("You can only delete happs you created"));
+}
+
+/**
  * Labels for posts.media_type. This schema uses "image"/"video", but the
  * original backend's check constraint rejects "image" (every photo post in
  * the old app failed silently), so we try the usual alternatives in turn and
