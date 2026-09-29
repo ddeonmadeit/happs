@@ -13,6 +13,10 @@ const TRAIL = (100 * Math.PI) / 180; // afterglow behind the line
 const TRAIL_STEPS = 36;
 const FADE = 3.6; // seconds a contact glows after the sweep passes
 const CONTACTS = 16;
+/** The line (and its afterglow) is invisible this close to the centre, px… */
+const LINE_HIDDEN = 44;
+/** …and fully faded in by here. */
+const LINE_FULL = 150;
 
 const GOLD = "240, 164, 60";
 const AMBER = "236, 120, 30";
@@ -61,9 +65,12 @@ function drawTrail(ctx: CanvasRenderingContext2D, cx: number, cy: number, range:
     ctx.arc(cx, cy, range, sweep - TRAIL, sweep);
     ctx.closePath();
     ctx.fill();
-    // Fade it out towards the edge (the canvas is otherwise empty at this point).
+    // Fade it out near the logo and towards the edge (the canvas is otherwise
+    // empty at this point).
     const edge = ctx.createRadialGradient(cx, cy, 0, cx, cy, range);
-    edge.addColorStop(0, "rgba(0, 0, 0, 1)");
+    edge.addColorStop(0, "rgba(0, 0, 0, 0)");
+    edge.addColorStop(Math.min(0.5, LINE_HIDDEN / range), "rgba(0, 0, 0, 0)");
+    edge.addColorStop(Math.min(0.6, LINE_FULL / range), "rgba(0, 0, 0, 1)");
     edge.addColorStop(1, "rgba(0, 0, 0, 0.3)");
     ctx.globalCompositeOperation = "destination-in";
     ctx.fillStyle = edge;
@@ -72,7 +79,9 @@ function drawTrail(ctx: CanvasRenderingContext2D, cx: number, cy: number, range:
     return;
   }
   const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, range);
-  glow.addColorStop(0, rgba(GOLD, 0.34));
+  glow.addColorStop(0, rgba(GOLD, 0));
+  glow.addColorStop(Math.min(0.4, LINE_HIDDEN / range), rgba(GOLD, 0));
+  glow.addColorStop(Math.min(0.45, LINE_FULL / range), rgba(GOLD, 0.34));
   glow.addColorStop(0.5, rgba(AMBER, 0.2));
   glow.addColorStop(1, rgba(AMBER, 0.05));
   ctx.fillStyle = glow;
@@ -149,21 +158,29 @@ export function Radar({ anchor, className }: { anchor: RefObject<HTMLElement | n
         ctx.stroke();
       }
 
-      // The sweep line itself, with a soft glow.
+      // The sweep line: fine and subtle, invisible near the logo and fading
+      // in a little way out, then out again towards the edge.
       const end = { x: cx + Math.cos(sweep) * range, y: cy + Math.sin(sweep) * range };
-      const line = ctx.createLinearGradient(cx, cy, end.x, end.y);
-      line.addColorStop(0, rgba(CREAM, 0.9 * intro));
-      line.addColorStop(0.6, rgba(GOLD, 0.55 * intro));
-      line.addColorStop(1, rgba(GOLD, 0.15 * intro));
+      const hidden = Math.min(0.3, LINE_HIDDEN / range);
+      const full = Math.min(0.5, LINE_FULL / range);
+      const lineGradient = (peak: number) => {
+        const g = ctx.createLinearGradient(cx, cy, end.x, end.y);
+        g.addColorStop(0, rgba(CREAM, 0));
+        g.addColorStop(hidden, rgba(CREAM, 0));
+        g.addColorStop(full, rgba(CREAM, peak * intro));
+        g.addColorStop(Math.max(full, 0.6), rgba(GOLD, peak * 0.65 * intro));
+        g.addColorStop(1, rgba(GOLD, peak * 0.15 * intro));
+        return g;
+      };
       ctx.lineCap = "round";
-      ctx.strokeStyle = rgba(GOLD, 0.12 * intro);
-      ctx.lineWidth = 6;
       ctx.beginPath();
       ctx.moveTo(cx, cy);
       ctx.lineTo(end.x, end.y);
+      ctx.strokeStyle = lineGradient(0.08);
+      ctx.lineWidth = 5;
       ctx.stroke();
-      ctx.strokeStyle = line;
-      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = lineGradient(0.42);
+      ctx.lineWidth = 1.1;
       ctx.stroke();
 
       // Contacts: light up as the line crosses them, then fade.
