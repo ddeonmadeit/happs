@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { motion } from "motion/react";
-import { Camera, Grid3X3, MapPin, MessageCircle, Play, Settings, UserRound } from "lucide-react";
+import { Camera, Grid3X3, MapPin, MessageCircle, Play, Settings, TicketIcon, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { HappRow, ProfileRow } from "@/integrations/supabase/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { TopBar } from "@/components/TopBar";
 import { SettingsSheet } from "@/components/SettingsSheet";
+import { useTicketing } from "@/hooks/useTicketing";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Field, Input, Textarea } from "@/components/ui/Input";
@@ -39,6 +40,7 @@ export default function Profile() {
   const { user, profile: ownProfile, setProfile: setOwnProfile } = useAuth();
   const targetId = userId ?? user?.id;
   const isOwn = !userId || userId === user?.id;
+  const ticketing = useTicketing();
 
   // Show what we had last time (or your own profile from sign-in) straight
   // away, and refresh underneath.
@@ -178,9 +180,16 @@ export default function Profile() {
         title={profile.username ? `@${profile.username}` : "Profile"}
         right={
           isOwn ? (
-            <IconButton label="Settings" variant="ghost" onClick={() => setSettingsOpen(true)}>
-              <Settings className="h-5 w-5" />
-            </IconButton>
+            <div className="flex items-center">
+              {ticketing && (
+                <IconButton label="Your tickets" variant="ghost" onClick={() => navigate("/tickets")}>
+                  <TicketIcon className="h-5 w-5" />
+                </IconButton>
+              )}
+              <IconButton label="Settings" variant="ghost" onClick={() => setSettingsOpen(true)}>
+                <Settings className="h-5 w-5" />
+              </IconButton>
+            </div>
           ) : null
         }
       />

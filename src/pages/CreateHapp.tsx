@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent }
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { addDays, format } from "date-fns";
-import { CalendarDays, ChevronRight, Clock, ImagePlus, MapPin } from "lucide-react";
+import { CalendarDays, ChevronRight, Clock, ImagePlus, MapPin, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { TopBar } from "@/components/TopBar";
@@ -12,10 +12,12 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Screen, spring } from "@/components/motion";
 import { LocationPicker, type PickedLocation } from "@/components/LocationPicker";
 import { useGeolocation } from "@/hooks/useGeolocation";
+import { useTicketing } from "@/hooks/useTicketing";
 import { createHapp } from "@/lib/api";
 import { draftStore, useDraft } from "@/lib/draft";
 import { reverseAddress } from "@/lib/mapbox";
 import { resizeImage, uploadMedia } from "@/lib/media";
+import { formatPrice, hostShare, MAX_PRICE_CENTS, MIN_PRICE_CENTS, PLATFORM_FEE_RATE } from "@/lib/tickets";
 import { cn, errorMessage, formatStart, startsIn } from "@/lib/utils";
 
 /** Scheduling window (matches the database). */
@@ -72,6 +74,12 @@ export default function CreateHapp() {
   const [time, setTime] = useState(format(initialStart, "HH:mm"));
   const [saving, setSaving] = useState(false);
 
+  // Entry: free, or a ticket price (only where paid happs are switched on).
+  const ticketing = useTicketing();
+  const [entry, setEntry] = useState<"free" | "paid">(previous?.priceCents ? "paid" : "free");
+  const [price, setPrice] = useState(previous?.priceCents ? String(previous.priceCents / 100) : "");
+  const [limit, setLimit] = useState(previous?.capacity ? String(previous.capacity) : "");
+
   useEffect(() => {
     if (!gps || picked) return;
     let cancelled = false;
@@ -107,6 +115,17 @@ export default function CreateHapp() {
             ? `Happs can be scheduled up to ${MAX_DAYS_AHEAD} days ahead`
             : null;
 
+  const paid = ticketing && entry === "paid";
+  const priceCents = paid ? Math.round(Number(price.replace(/[^0-9.]/g, "")) * 100) || 0 : 0;
+  const capacity = paid && Number(limit) > 0 ? Math.floor(Number(limit)) : null;
+  const priceError = !paid
+    ? null
+    : !price.trim()
+      ? "Set a ticket price"
+      : priceCents < MIN_PRICE_CENTS || priceCents > MAX_PRICE_CENTS
+        ? `Tickets can be ${formatPrice(MIN_PRICE_CENTS)} to ${formatPrice(MAX_PRICE_CENTS)}`
+        : null;
+
   const pickIcon = async (file?: File) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
@@ -120,11 +139,11 @@ export default function CreateHapp() {
     setIcon({ blob, preview: URL.createObjectURL(blob) });
   };
 
-  const canContinue = Boolean(name.trim() && icon && place && !startError && !saving);
+  const canContinue = Boolean(name.trim() && icon && place && !startError && !priceError && !saving);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!icon || !place || startError) return;
+    if (!icon || !place || startError || priceError) return;
     const details = {
       name: name.trim(),
       description: description.trim(),
@@ -132,6 +151,8 @@ export default function CreateHapp() {
       longitude: place.longitude,
       suburb: address.trim() || place.suburb || "Pinned location",
       startsAt: start ? start.toISOString() : null,
+      priceCents,
+      capacity,
     };
 
     // Starting now: take the first photo, then it goes live.
@@ -155,6 +176,8 @@ export default function CreateHapp() {
           suburb: details.suburb,
           icon_url: iconUrl,
           starts_at: details.startsAt,
+          price_cents: details.priceCents,
+          capacity: details.capacity,
         },
         user.id,
       );
@@ -334,6 +357,79 @@ export default function CreateHapp() {
               </motion.button>
             </div>
           </Field>
+          {ticketing && (
+            <Field
+              label="Entry"
+              htmlFor="happ-price"
+              error={paid && price.trim() ? priceError : null}
+              hint={
+                paid
+                  ? priceCents && !priceError
+                    ? `You get ${formatPrice(hostShare(priceCents))} a ticket · The Happs keeps ${Math.round(PLATFORM_FEE_RATE * 100)}%, card fees included. Set up payouts whenever you like.`
+                    : `The Happs keeps ${Math.round(PLATFORM_FEE_RATE * 100)}% of each ticket, card fees included`
+                  : "Anyone can join and post"
+              }
+            >
+              <div className="grid grid-cols-2 rounded-2xl bg-muted p-1" role="radiogroup" aria-label="Entry">
+                {(["free", "paid"] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    role="radio"
+                    aria-checked={entry === option}
+                    onClick={() => setEntry(option)}
+                    className="relative h-11 rounded-xl text-[15px] font-bold"
+                  >
+                    {entry === option && (
+                      <motion.span layoutId="entry-pill" transition={spring.bouncy} className="glitch-bg absolute inset-0 rounded-xl" />
+                    )}
+                    <span className={cn("relative transition-colors", entry === option ? "text-accent-foreground" : "text-muted-foreground")}>
+                      {option === "free" ? "Free" : "Paid"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <AnimatePresence initial={false}>
+                {paid && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={spring.snappy}
+                    className="overflow-hidden"
+                  >
+                    <div className="grid grid-cols-2 gap-3 pt-1">
+                      <label className="flex h-[52px] items-center gap-1.5 rounded-2xl border-2 border-transparent bg-muted px-4 transition-colors focus-within:border-accent/70">
+                        <span className="text-[16px] font-bold text-accent">$</span>
+                        <input
+                          id="happ-price"
+                          inputMode="decimal"
+                          value={price}
+                          onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, "").slice(0, 7))}
+                          placeholder="Price"
+                          aria-label="Ticket price in dollars"
+                          autoComplete="off"
+                          className="min-w-0 flex-1 bg-transparent text-[16px] font-semibold placeholder:font-normal placeholder:text-muted-foreground/70 focus:outline-none"
+                        />
+                      </label>
+                      <label className="flex h-[52px] items-center gap-2 rounded-2xl border-2 border-transparent bg-muted px-4 transition-colors focus-within:border-accent/70">
+                        <Users className="h-5 w-5 shrink-0 text-accent" />
+                        <input
+                          inputMode="numeric"
+                          value={limit}
+                          onChange={(e) => setLimit(e.target.value.replace(/\D/g, "").slice(0, 5))}
+                          placeholder="No limit"
+                          aria-label="Ticket limit"
+                          autoComplete="off"
+                          className="min-w-0 flex-1 bg-transparent text-[16px] font-semibold placeholder:font-normal placeholder:text-muted-foreground/70 focus:outline-none"
+                        />
+                      </label>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </Field>
+          )}
           <div className="h-4" />
         </div>
 

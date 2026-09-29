@@ -135,6 +135,8 @@ Everything the backend needs lives in `supabase/`.
 | `conversations`, `messages` | Direct messages (one conversation per pair of users)          |
 | `push_subscriptions` | Web push endpoints (+ rough location for "nearby" alerts)            |
 | `notification_log`   | Makes sure each message/happ is only notified once (service role only) |
+| `tickets`            | Tickets for paid happs: status, door code, Stripe payment and payout ids |
+| `stripe_accounts`    | Each host's Stripe payout account and whether it can be paid         |
 
 Rules the database enforces (instead of trusting the browser):
 
@@ -158,6 +160,12 @@ Rules the database enforces (instead of trusting the browser):
 | `get-mapbox-token` | Returns the public Mapbox token (skipped if `VITE_MAPBOX_TOKEN` is set) |
 | `get-vapid-key`    | Returns the VAPID public key for push subscriptions            |
 | `send-push`        | Notifies the recipient of a new message, and nearby subscribers of a new happ |
+| `stripe-connect`   | A host's payout setup: status, Stripe onboarding link, Stripe dashboard link |
+| `ticket-checkout`  | Holds a ticket for 15 minutes and starts the payment              |
+| `stripe-webhook`   | Marks tickets paid or refunded, and keeps host payout status up to date |
+| `ticket-refund`    | Refunds a ticket (buyer until 24 h before the start; host any time) |
+| `cancel-happ`      | Cancels a paid happ and refunds everyone                          |
+| `release-payouts`  | Hourly: pays hosts 24 h after their happ starts; clears stale holds |
 
 ### Moving data over from the old app
 
@@ -178,6 +186,93 @@ if you're retiring that project.
 
 The map is limited to Greater Sydney, as in the original. Change `MAP_BOUNDS`
 and `MAP_CENTER` in `src/lib/constants.ts` to open it up.
+
+### Paid happs (tickets)
+
+Hosts can make a happ **Free** or **Paid** (from $2 to $1,000, with an optional
+ticket limit). People buy in the app, in a sheet over the happ: Apple Pay or
+Google Pay in one tap, or a card. Their ticket is a QR code in **Tickets**, and
+the host scans it at the door from **Check in** on the happ card.
+
+How the money works:
+
+- **The Happs keeps 13% of each ticket** and pays Stripe's card fees out of that.
+  A $20 ticket pays the host $17.40.
+- **Refunds:** buyers get a full refund from their ticket until 24 hours before
+  the happ starts. Hosts can refund anyone at any time. Cancelling a paid happ
+  refunds everyone.
+- **Payouts:** the host is paid 24 hours after the happ starts, straight to
+  their bank.
+- **No setup to start selling.** Hosts don't have to connect anything before
+  their first sale. Money waits on The Happs' Stripe balance until they tap
+  **Set up payouts** (Stripe's own form, about 2 minutes: bank details and
+  maybe ID). The happ card nudges them until it's done.
+- Paying for a ticket also unlocks posting to that happ. The database enforces
+  this, and it stops a paid happ from being deleted while tickets are live (it
+  has to be cancelled, which refunds them).
+
+Under the hood this is Stripe Connect (Express accounts) with *separate
+charges and transfers*: the buyer pays The Happs, and `release-payouts` sends
+the host's share once refunds have closed and the happ has happened.
+
+Paid happs need this repo's backend. They stay hidden on the original one,
+and they stay hidden until a Stripe key is set. To switch them on:
+
+1. **Stripe:** create an account at [stripe.com](https://stripe.com) and turn on
+   **Connect** (Dashboard → Connect → Get started). Choose the platform/marketplace
+   model with **Express** accounts, and fill in the platform profile.
+2. **Function secrets:**
+   ```bash
+   npx supabase secrets set STRIPE_SECRET_KEY=sk_live_...        # or sk_test_ while testing
+   npx supabase secrets set APP_URL=https://<your-domain>/        # where Stripe sends hosts back
+   npx supabase secrets set CRON_SECRET=$(openssl rand -hex 24)
+   # Optional: npx supabase secrets set STRIPE_COUNTRY=AU
+   ```
+3. **Deploy the functions:**
+   ```bash
+   for f in stripe-connect ticket-checkout stripe-webhook ticket-refund cancel-happ release-payouts; do
+     npx supabase functions deploy $f
+   done
+   ```
+4. **Webhooks** (Stripe Dashboard → Developers → Webhooks). Add two endpoints,
+   both pointing at `https://<project-ref>.supabase.co/functions/v1/stripe-webhook`:
+   - *Events on your account:* `payment_intent.succeeded`,
+     `payment_intent.canceled`, `charge.refunded`
+   - *Events on connected accounts:* `account.updated`
+
+   Then save both signing secrets, comma-separated:
+   ```bash
+   npx supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_first,whsec_second
+   ```
+5. **Hourly payouts.** In the Supabase dashboard, enable the `pg_cron` and
+   `pg_net` extensions, then run this in the SQL editor (use your project ref and
+   `CRON_SECRET`):
+   ```sql
+   select cron.schedule('release-payouts', '7 * * * *', $$
+     select net.http_post(
+       url := 'https://<project-ref>.supabase.co/functions/v1/release-payouts',
+       headers := jsonb_build_object('x-cron-secret', '<CRON_SECRET>')
+     );
+   $$);
+   ```
+   This also clears unpaid 15-minute ticket holds.
+6. **Apple Pay:** Stripe Dashboard → Settings → Payment methods → Apple Pay → add
+   your domain (for example `ddeonmadeit.github.io`). Google Pay needs no setup.
+7. **The app:** set the repository variable `VITE_STRIPE_PUBLISHABLE_KEY`
+   (`pk_live_...`), plus `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` for
+   this backend, then redeploy. For local work, put it in `.env`.
+
+Test mode works end to end with `sk_test_` / `pk_test_` keys and Stripe's test
+card `4242 4242 4242 4242`.
+
+**App Store notes.** Tickets for real-world events are physical goods and
+services, so Apple lets them be paid for with Stripe instead of in-app purchase
+(App Review Guideline 3.1.3(e)) and takes no cut. To submit the app you'll
+still need:
+
+- A native wrapper (for example Capacitor) around this web app.
+- In-app account deletion.
+- A way to report and block people and posts, since the app has user-generated content.
 
 ---
 

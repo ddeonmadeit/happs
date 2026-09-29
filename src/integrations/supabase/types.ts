@@ -46,6 +46,38 @@ export type HappRow = {
   updated_at: string;
   /** When it goes live (scheduled happs). Missing on the original backend, which uses created_at. */
   starts_at?: string;
+  /** Ticket price in cents; 0 = free. (Ticketing columns: modern schema only.) */
+  price_cents?: number;
+  currency?: string;
+  capacity?: number | null;
+  cancelled_at?: string | null;
+};
+
+export type TicketStatus = "reserved" | "valid" | "refunded" | "expired";
+
+export type TicketRow = {
+  id: string;
+  happ_id: string;
+  user_id: string;
+  status: TicketStatus;
+  code: string;
+  amount_cents: number;
+  platform_fee_cents: number;
+  currency: string;
+  reserved_until: string;
+  paid_at: string | null;
+  refunded_at: string | null;
+  transferred_at: string | null;
+  checked_in_at: string | null;
+  created_at: string;
+};
+
+export type StripeAccountRow = {
+  user_id: string;
+  stripe_account_id: string;
+  details_submitted: boolean;
+  charges_enabled: boolean;
+  payouts_enabled: boolean;
 };
 
 export type HappParticipantRow = {
@@ -121,6 +153,9 @@ export type MapHappRow = {
   last_activity_at: string;
   created_at: string;
   starts_at: string;
+  price_cents: number;
+  currency: string;
+  creator_id: string;
 };
 
 export type ConversationSummaryRow = {
@@ -194,6 +229,15 @@ export type Database = {
         ]
       >;
       push_subscriptions: Table<PushSubscriptionRow, "user_id" | "endpoint" | "p256dh" | "auth">;
+      tickets: Table<
+        TicketRow,
+        "happ_id" | "user_id" | "amount_cents" | "platform_fee_cents" | "currency",
+        [
+          Rel<"tickets_happ_id_fkey", "happ_id", "happs", "id">,
+          Rel<"tickets_user_id_fkey", "user_id", "profiles", "user_id">,
+        ]
+      >;
+      stripe_accounts: Table<StripeAccountRow, "user_id" | "stripe_account_id">;
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -211,6 +255,8 @@ export type Database = {
         Args: { p_endpoint: string; p_latitude: number; p_longitude: number };
         Returns: undefined;
       };
+      tickets_taken: { Args: { p_happ_id: string }; Returns: number };
+      check_in_ticket: { Args: { p_code: string }; Returns: Json };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

@@ -16,6 +16,10 @@ export type NewHappDetails = {
   suburb: string;
   /** ISO start time for a scheduled happ; null means it starts now. */
   startsAt: string | null;
+  /** Ticket price in cents; 0 is free. */
+  priceCents: number;
+  /** Most tickets that can be sold; null is no limit. */
+  capacity: number | null;
   icon: Blob;
   iconPreview: string;
 };

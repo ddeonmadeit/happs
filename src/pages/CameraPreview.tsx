@@ -75,6 +75,8 @@ export default function CameraPreview() {
             suburb: target.happ.suburb,
             icon_url: iconUrl,
             starts_at: target.happ.startsAt,
+            price_cents: target.happ.priceCents,
+            capacity: target.happ.capacity,
           },
           user.id,
         );

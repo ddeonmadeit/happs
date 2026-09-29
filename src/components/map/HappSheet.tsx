@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { CalendarClock, Camera, Clock, MapPin, Navigation, Trash2, Users } from "lucide-react";
+import { Banknote, CalendarClock, Camera, ChevronRight, Clock, MapPin, Navigation, ScanLine, TicketIcon, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import type { HappRow } from "@/integrations/supabase/types";
 import { deleteHapp, fetchHapp, fetchParticipants, happStartsAt, isUpcoming, type Participant } from "@/lib/api";
@@ -9,21 +9,30 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useImageColor } from "@/hooks/useImageColor";
 import { useRealtime } from "@/hooks/useRealtime";
 import { useNow } from "@/hooks/useNow";
+import { useTicketing } from "@/hooks/useTicketing";
 import { Sheet } from "@/components/ui/Sheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Pressable, spring, Stagger, StaggerItem } from "@/components/motion";
+import { TicketSheet } from "@/components/tickets/TicketSheet";
 import { draftStore } from "@/lib/draft";
+import { directionsUrl } from "@/lib/directions";
+import {
+  cancelHapp,
+  fetchMyTicketFor,
+  fetchSales,
+  fetchTicket,
+  formatPrice,
+  payoutsReady,
+  ticketsLeft,
+  type Sales,
+  type TicketWithHapp,
+} from "@/lib/tickets";
 import { cn, errorMessage, formatStart, shortTimeAgo, startsIn } from "@/lib/utils";
 
-/** Directions to a happ: Apple Maps on iPhone/iPad, Google Maps elsewhere. */
-function directionsUrl(happ: HappRow) {
-  const at = `${happ.latitude},${happ.longitude}`;
-  const apple = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && "ontouchend" in document;
-  return apple
-    ? `https://maps.apple.com/?daddr=${at}&q=${encodeURIComponent(happ.name)}`
-    : `https://www.google.com/maps/dir/?api=1&destination=${at}`;
-}
+// Stripe's payment fields load only when someone goes to buy.
+const loadCheckout = () => import("@/components/tickets/CheckoutSheet");
+const CheckoutSheet = lazy(() => loadCheckout().then((m) => ({ default: m.CheckoutSheet })));
 
 type Props = {
   happId: string | null;
@@ -43,6 +52,15 @@ export function HappSheet({ happId, onClose, onLoaded, onDeleted }: Props) {
   const [people, setPeople] = useState<Participant[] | null>(null);
   const [missing, setMissing] = useState(false);
 
+  // Tickets (paid happs only): yours if you're going, sales if you're hosting.
+  const ticketing = useTicketing();
+  const [myTicketId, setMyTicketId] = useState<string | null>(null);
+  const [left, setLeft] = useState<number | null>(null);
+  const [sales, setSales] = useState<Sales | null>(null);
+  const [payoutsOk, setPayoutsOk] = useState(true);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [ticket, setTicket] = useState<TicketWithHapp | null>(null);
+
   const load = useCallback(async () => {
     if (!happId) return;
     const [h, p] = await Promise.all([fetchHapp(happId), fetchParticipants(happId)]);
@@ -52,14 +70,38 @@ export function HappSheet({ happId, onClose, onLoaded, onDeleted }: Props) {
     if (h) onLoaded?.(h);
   }, [happId, onLoaded]);
 
+  const paid = ticketing && (happ?.price_cents ?? 0) > 0;
+  const isMine = Boolean(happ && user && happ.creator_id === user.id);
+
+  const loadTickets = useCallback(async () => {
+    if (!happ || !user || !paid) return;
+    if (isMine) {
+      const [s, ok] = await Promise.all([fetchSales(happ.id), payoutsReady(user.id)]);
+      setSales(s);
+      setPayoutsOk(ok);
+    } else {
+      setMyTicketId((await fetchMyTicketFor(happ.id, user.id))?.id ?? null);
+    }
+    setLeft(await ticketsLeft(happ));
+  }, [happ, user, paid, isMine]);
+
   useEffect(() => {
     setHapp(null);
     setPeople(null);
     setMissing(false);
+    setMyTicketId(null);
+    setSales(null);
+    setLeft(null);
     load();
   }, [load]);
 
+  useEffect(() => {
+    loadTickets();
+    if (paid && !isMine) void loadCheckout();
+  }, [loadTickets, paid, isMine]);
+
   useRealtime(happId ? [{ table: "happ_participants", filter: `happ_id=eq.${happId}` }] : null, load);
+  useRealtime(happId && paid ? [{ table: "tickets", filter: `happ_id=eq.${happId}` }] : null, loadTickets);
 
   const now = useNow();
   const storytellers = (people ?? []).filter((p) => p.hasPosts);
@@ -67,14 +109,21 @@ export function HappSheet({ happId, onClose, onLoaded, onDeleted }: Props) {
   const upcoming = startsAt ? isUpcoming(startsAt, now) : false;
 
   const color = useImageColor(happ?.icon_url);
-  const isMine = Boolean(happ && user && happ.creator_id === user.id);
+  const soldOut = left === 0;
+  const sold = sales?.sold ?? 0;
 
   const remove = async () => {
     if (!happ || !user) return;
     setDeleting(true);
     try {
-      await deleteHapp(happ.id, user.id);
-      toast.success(`${happ.name} deleted`);
+      if (paid) {
+        // Paid happs are cancelled server-side so every ticket is refunded.
+        const { refunded } = await cancelHapp(happ.id);
+        toast.success(refunded ? `${happ.name} cancelled · ${refunded} refunded` : `${happ.name} deleted`);
+      } else {
+        await deleteHapp(happ.id, user.id);
+        toast.success(`${happ.name} deleted`);
+      }
       setConfirmDelete(false);
       onDeleted?.(happ.id);
       onClose();
@@ -89,6 +138,12 @@ export function HappSheet({ happId, onClose, onLoaded, onDeleted }: Props) {
     if (!happ) return;
     draftStore.setTarget({ kind: "existing", happId: happ.id, happName: happ.name });
     navigate("/camera");
+  };
+
+  const openTicket = async () => {
+    if (!myTicketId) return;
+    const t = await fetchTicket(myTicketId);
+    if (t) setTicket(t);
   };
 
   return (
@@ -170,7 +225,17 @@ export function HappSheet({ happId, onClose, onLoaded, onDeleted }: Props) {
                       {happ.is_active ? "Live" : "Dead"}
                     </span>
                   )}
-
+                  {paid && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-2.5 py-0.5 text-xs font-bold text-foreground">
+                      <TicketIcon className="h-3 w-3 text-accent" strokeWidth={2.6} />
+                      {formatPrice(happ.price_cents ?? 0, happ.currency)}
+                    </span>
+                  )}
+                  {paid && left !== null && (
+                    <span className={cn("text-xs font-semibold", left <= 10 ? "text-accent" : "text-muted-foreground")}>
+                      {soldOut ? "Sold out" : `${left} left`}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -198,6 +263,40 @@ export function HappSheet({ happId, onClose, onLoaded, onDeleted }: Props) {
                   <span className="font-bold">Goes live {formatStart(startsAt)}</span>
                   <span className="text-muted-foreground"> · {startsIn(startsAt)}</span>
                 </p>
+              </div>
+            )}
+
+            {paid && isMine && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-3 rounded-3xl bg-muted/60 py-2.5 pl-4 pr-2.5">
+                  <TicketIcon className="h-5 w-5 shrink-0 text-accent" />
+                  <p className="min-w-0 flex-1 text-sm leading-snug">
+                    <span className="font-bold">
+                      {sold} {sold === 1 ? "ticket" : "tickets"} sold
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {formatPrice(sales?.earningsCents ?? 0, happ.currency)} to you
+                      {sales?.checkedIn ? ` · ${sales.checkedIn} checked in` : ""}
+                    </span>
+                  </p>
+                  <Button size="sm" variant="secondary" onClick={() => navigate(`/happ/${happ.id}/check-in`)}>
+                    <ScanLine className="h-4 w-4" strokeWidth={2.4} /> Check in
+                  </Button>
+                </div>
+                {!payoutsOk && (
+                  <Pressable
+                    pressScale={0.98}
+                    onClick={() => navigate("/payouts")}
+                    className="flex w-full items-center gap-3 rounded-3xl border border-accent/25 bg-accent/10 px-4 py-3 text-left"
+                  >
+                    <Banknote className="h-5 w-5 shrink-0 text-accent" />
+                    <span className="min-w-0 flex-1 text-sm leading-snug">
+                      <span className="font-bold">Set up payouts</span>
+                      <span className="block text-xs text-muted-foreground">2 minutes, so ticket money reaches your bank</span>
+                    </span>
+                    <ChevronRight className="h-5 w-5 shrink-0 text-accent" />
+                  </Pressable>
+                )}
               </div>
             )}
 
@@ -259,14 +358,37 @@ export function HappSheet({ happId, onClose, onLoaded, onDeleted }: Props) {
               )}
             </div>
 
-            {upcoming && startsAt ? (
-              <div className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-muted text-base font-bold text-muted-foreground">
-                <Clock className="h-5 w-5" strokeWidth={2.5} /> Stories open {startsIn(startsAt)}
-              </div>
-            ) : (
-              <Button size="lg" className="w-full" onClick={joinAndPost}>
-                <Camera className="h-5 w-5" strokeWidth={2.5} /> Join & post
+            {paid && !isMine && !myTicketId ? (
+              <Button
+                size="lg"
+                className="w-full"
+                disabled={soldOut || (!upcoming && !happ.is_active)}
+                onClick={() => setCheckoutOpen(true)}
+              >
+                <TicketIcon className="h-5 w-5" strokeWidth={2.5} />
+                {soldOut ? "Sold out" : `Get ticket · ${formatPrice(happ.price_cents ?? 0, happ.currency)}`}
               </Button>
+            ) : upcoming && startsAt ? (
+              myTicketId ? (
+                <Button size="lg" className="w-full" onClick={openTicket}>
+                  <TicketIcon className="h-5 w-5" strokeWidth={2.5} /> Your ticket
+                </Button>
+              ) : (
+                <div className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-muted text-base font-bold text-muted-foreground">
+                  <Clock className="h-5 w-5" strokeWidth={2.5} /> Stories open {startsIn(startsAt)}
+                </div>
+              )
+            ) : (
+              <div className="flex gap-3">
+                <Button size="lg" className="min-w-0 flex-1" onClick={joinAndPost}>
+                  <Camera className="h-5 w-5" strokeWidth={2.5} /> Join & post
+                </Button>
+                {myTicketId && (
+                  <IconButton label="Your ticket" size="lg" onClick={openTicket}>
+                    <TicketIcon className="h-6 w-6" />
+                  </IconButton>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -276,18 +398,43 @@ export function HappSheet({ happId, onClose, onLoaded, onDeleted }: Props) {
         open={confirmDelete && Boolean(happId)}
         onClose={() => setConfirmDelete(false)}
         variant="dialog"
-        title={`Delete ${happ?.name ?? "this happ"}?`}
-        description="It comes off the map for everyone, along with its stories. This can’t be undone."
+        title={`${paid && sold ? "Cancel" : "Delete"} ${happ?.name ?? "this happ"}?`}
+        description={
+          paid && sold
+            ? `Everyone with a ticket gets a full refund (${sold} ${sold === 1 ? "ticket" : "tickets"}), and it comes off the map. This can’t be undone.`
+            : "It comes off the map for everyone, along with its stories. This can’t be undone."
+        }
       >
         <div className="flex gap-3">
           <Button variant="secondary" className="flex-1" onClick={() => setConfirmDelete(false)}>
-            Cancel
+            {paid && sold ? "Keep it" : "Cancel"}
           </Button>
           <Button variant="destructive" className="flex-1" loading={deleting} onClick={remove}>
-            Delete
+            {paid && sold ? "Cancel happ" : "Delete"}
           </Button>
         </div>
       </Sheet>
+
+      {happ && paid && !isMine && (
+        <Suspense fallback={null}>
+          <CheckoutSheet
+            open={checkoutOpen}
+            happ={{
+              id: happ.id,
+              name: happ.name,
+              price_cents: happ.price_cents ?? 0,
+              currency: happ.currency ?? "aud",
+              startsAt: happStartsAt(happ),
+            }}
+            onClose={() => setCheckoutOpen(false)}
+            onPaid={(ticketId) => {
+              setMyTicketId(ticketId);
+              loadTickets();
+            }}
+          />
+        </Suspense>
+      )}
+      <TicketSheet ticket={ticket} onClose={() => setTicket(null)} onChanged={loadTickets} />
     </>
   );
 }

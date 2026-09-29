@@ -90,6 +90,9 @@ export type MapHapp = {
   iconUrl: string | null;
   /** When it goes live; in the future for a scheduled happ. */
   startsAt: string;
+  /** Ticket price in cents (0 = free). */
+  priceCents: number;
+  creatorId: string;
 };
 
 /**
@@ -126,6 +129,8 @@ export async function fetchMapHapps(): Promise<MapHapp[]> {
       isActive: h.is_active,
       iconUrl: h.icon_url,
       startsAt: h.starts_at ?? h.created_at,
+      priceCents: h.price_cents ?? 0,
+      creatorId: h.creator_id,
     }));
   }
 
@@ -134,7 +139,7 @@ export async function fetchMapHapps(): Promise<MapHapp[]> {
   const [{ data, error }, { data: recentPosts }] = await Promise.all([
     supabase
       .from("happs")
-      .select("id, name, latitude, longitude, suburb, icon_url, is_active, participant_count, last_activity_at, created_at")
+      .select("id, name, latitude, longitude, suburb, icon_url, is_active, participant_count, last_activity_at, created_at, creator_id")
       .gt("created_at", iso(24 * 3600_000))
       .or(`last_activity_at.gt.${iso(2 * 3600_000)},created_at.gt.${iso(2 * 3600_000)}`)
       .order("last_activity_at", { ascending: false })
@@ -156,6 +161,8 @@ export async function fetchMapHapps(): Promise<MapHapp[]> {
     isActive: h.is_active,
     iconUrl: h.icon_url,
     startsAt: h.created_at,
+    priceCents: 0,
+    creatorId: h.creator_id,
   }));
 }
 
@@ -248,17 +255,22 @@ type NewHapp = {
   icon_url: string | null;
   /** ISO time for a scheduled happ; null or past means now. */
   starts_at: string | null;
+  /** Ticket price in cents (0 = free) and optional limit. Modern backend only. */
+  price_cents?: number;
+  capacity?: number | null;
 };
 
-export async function createHapp({ starts_at, ...happ }: NewHapp, userId: string) {
+export async function createHapp({ starts_at, price_cents, capacity, ...happ }: NewHapp, userId: string) {
   const legacy = await isLegacy();
+  if (legacy && price_cents) fail(new Error("Paid happs aren't available yet"));
+  const tickets = !legacy && price_cents ? { price_cents, capacity: capacity ?? null } : {};
   const scheduled = starts_at && isUpcoming(starts_at) ? starts_at : null;
   // The original backend has no starts_at: a scheduled happ is stored as
   // "created" at its start time, with its activity clock starting then too.
   const schedule = scheduled ? (legacy ? { created_at: scheduled, last_activity_at: scheduled } : { starts_at: scheduled }) : {};
   const { data, error } = await supabase
     .from("happs")
-    .insert({ ...happ, ...schedule, creator_id: userId, is_active: true })
+    .insert({ ...happ, ...schedule, ...tickets, creator_id: userId, is_active: true })
     .select("id")
     .single();
   if (error) fail(error);

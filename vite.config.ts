@@ -60,7 +60,7 @@ export default defineConfig({
       injectManifest: {
         globPatterns: ["**/*.{js,css,html,svg,png,ico,ttf,woff2,webp}"],
         // Only the Latin cut of Inter is precached; other scripts load on demand.
-        globIgnores: ["splash/**", "404.html", "**/inter-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese,latin-ext}-*"],
+        globIgnores: ["splash/**", "404.html", "**/jsQR-*", "**/inter-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese,latin-ext}-*"],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
       manifest: {

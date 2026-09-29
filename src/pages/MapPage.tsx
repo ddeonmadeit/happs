@@ -28,6 +28,7 @@ import {
   type MapHapp,
 } from "@/lib/api";
 import { draftStore } from "@/lib/draft";
+import { fetchMyTicketFor } from "@/lib/tickets";
 import { readCache, writeCache } from "@/lib/cache";
 import { NEARBY_RADIUS_M } from "@/lib/constants";
 import { cn, distanceMeters, errorMessage } from "@/lib/utils";
@@ -132,8 +133,14 @@ export default function MapPage({ active }: { active: boolean }) {
     mapRef.current?.flyTo(h, { offsetY: window.innerHeight * 0.22 });
   }, []);
 
-  const startPost = () => {
-    if (!nearby) return;
+  const startPost = async () => {
+    if (!nearby || !user) return;
+    // Paid happs: posting is for people with a ticket (and the host).
+    if (nearby.priceCents > 0 && nearby.creatorId !== user.id && !(await fetchMyTicketFor(nearby.id, user.id))) {
+      toast("Get a ticket to post here");
+      navigate(`/happ/${nearby.id}`);
+      return;
+    }
     draftStore.setTarget({ kind: "existing", happId: nearby.id, happName: nearby.name });
     navigate("/camera");
   };

@@ -20,6 +20,7 @@ const screens = {
   cameraPreview: () => import("@/pages/CameraPreview"),
   messages: () => import("@/pages/Messages"),
   chat: () => import("@/pages/Chat"),
+  tickets: () => import("@/pages/Tickets"),
 };
 
 const MapPage = lazyPage(() => import("@/pages/MapPage"));
@@ -30,6 +31,9 @@ const Camera = lazyPage(screens.camera);
 const CameraPreview = lazyPage(screens.cameraPreview);
 const Messages = lazyPage(screens.messages);
 const Chat = lazyPage(screens.chat);
+const Tickets = lazyPage(screens.tickets);
+const Payouts = lazyPage(() => import("@/pages/Payouts"));
+const CheckIn = lazyPage(() => import("@/pages/CheckIn"));
 const Install = lazyPage(() => import("@/pages/Install"));
 const NotFound = lazyPage(() => import("@/pages/NotFound"));
 
@@ -78,6 +82,7 @@ function Shell() {
           <Route path="/map" element={protect(null)} />
           <Route path="/happ/:id" element={protect(null)} />
           <Route path="/happ/:id/story/:storyId" element={protect(<Lazy el={<Story />} />)} />
+          <Route path="/happ/:id/check-in" element={protect(<Lazy el={<CheckIn />} />)} />
           <Route path="/create-happ" element={protect(<Lazy el={<CreateHapp />} />)} />
           <Route path="/profile" element={protect(<Lazy el={<Profile />} />)} />
           <Route path="/profile/:userId" element={protect(<Lazy el={<Profile />} />)} />
@@ -85,6 +90,8 @@ function Shell() {
           <Route path="/camera/preview" element={protect(<Lazy el={<CameraPreview />} />)} />
           <Route path="/messages" element={protect(<Lazy el={<Messages />} />)} />
           <Route path="/messages/:conversationId" element={protect(<Lazy el={<Chat />} />)} />
+          <Route path="/tickets" element={protect(<Lazy el={<Tickets />} />)} />
+          <Route path="/payouts" element={protect(<Lazy el={<Payouts />} />)} />
           <Route path="/install" element={<Lazy el={<Install />} />} />
           <Route path="*" element={<Lazy el={<NotFound />} />} />
         </Routes>

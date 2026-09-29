@@ -16,3 +16,23 @@ verify_jwt = false
 
 [functions.send-push]
 verify_jwt = false
+
+# Ticketing. They check the signed-in user themselves (the webhook checks
+# Stripe's signature; release-payouts checks CRON_SECRET).
+[functions.stripe-connect]
+verify_jwt = false
+
+[functions.ticket-checkout]
+verify_jwt = false
+
+[functions.ticket-refund]
+verify_jwt = false
+
+[functions.cancel-happ]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.release-payouts]
+verify_jwt = false
