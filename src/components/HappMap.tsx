@@ -43,7 +43,7 @@ type MarkerEntry = {
 const SVG_NS = "http://www.w3.org/2000/svg";
 /** Room taken by the floating controls at the top and bottom of the map. */
 const SAFE_TOP = 150;
-const SAFE_BOTTOM = 250;
+const SAFE_BOTTOM = 190;
 
 function markerSize(postCount: number) {
   return 44 + Math.min(postCount / 3, 6) * 7;

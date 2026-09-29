@@ -19,7 +19,14 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button, IconButton } from "@/components/ui/Button";
 import { useGoBack } from "@/components/TopBar";
-import { fetchMapHapps, fetchMyDeadHappVote, isUpcoming, NotParticipantError, toggleDeadHapp, type MapHapp } from "@/lib/api";
+import {
+  fetchMapHapps,
+  fetchMyDeadHappVote,
+  isUpcoming,
+  NotParticipantError,
+  toggleDeadHapp,
+  type MapHapp,
+} from "@/lib/api";
 import { draftStore } from "@/lib/draft";
 import { NEARBY_RADIUS_M } from "@/lib/constants";
 import { cn, distanceMeters, errorMessage } from "@/lib/utils";
@@ -157,56 +164,78 @@ export default function MapPage({ active }: { active: boolean }) {
         className="absolute inset-0"
       />
 
-      {/* Top right: you, and your messages */}
-      <div className="pointer-events-none absolute right-0 top-0 z-30 flex flex-col items-center gap-3 px-4 pt-safe">
+      {/* Top: search wedged in the left corner; you and your messages on the right */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start gap-3 px-4 pt-safe">
         <motion.button
           type="button"
-          aria-label="Your profile"
-          onClick={() => navigate("/profile")}
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          whileTap={{ scale: 0.85 }}
-          transition={{ ...spring.bouncy, delay: 0.1 }}
-          className={cn(
-            "glass pointer-events-auto flex items-center justify-center rounded-full p-1",
-            dhPressed && "ring-[3px] ring-dead",
-          )}
+          onClick={() => setSearchOpen(true)}
+          initial={{ y: -40, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          whileTap={{ scale: 0.97 }}
+          transition={{ ...spring.snappy, delay: 0.05 }}
+          className="glass pointer-events-auto flex h-[54px] min-w-0 flex-1 items-center gap-2.5 rounded-full pl-4 pr-2 text-left"
         >
-          <Avatar src={profile?.avatar_url} name={profile?.display_name || profile?.username} size="h-11 w-11" />
+          <Search className="h-5 w-5 shrink-0 text-accent" strokeWidth={2.6} />
+          <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-muted-foreground">
+            Search happs or people
+          </span>
+          {liveHapps.length > 0 && (
+            <span className="shrink-0 rounded-full bg-accent/15 px-2.5 py-1 text-xs font-bold text-accent">
+              {liveHapps.length} live
+            </span>
+          )}
         </motion.button>
 
-        <motion.div
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ ...spring.bouncy, delay: 0.16 }}
-          className="pointer-events-auto"
-        >
-          <IconButton
-            label={unread ? `Messages, ${unread} unread` : "Messages"}
-            variant="glass"
-            size="lg"
-            onClick={() => navigate("/messages")}
+        <div className="flex shrink-0 flex-col items-center gap-3">
+          <motion.button
+            type="button"
+            aria-label="Your profile"
+            onClick={() => navigate("/profile")}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            whileTap={{ scale: 0.85 }}
+            transition={{ ...spring.bouncy, delay: 0.1 }}
+            className={cn(
+              "glass pointer-events-auto flex items-center justify-center rounded-full p-1",
+              dhPressed && "ring-[3px] ring-dead",
+            )}
           >
-            <MessageCircle className="h-6 w-6" strokeWidth={2.2} />
-            <AnimatePresence>
-              {unread > 0 && (
-                <motion.span
-                  key={unread}
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  exit={{ scale: 0 }}
-                  transition={spring.bouncy}
-                  className="absolute -right-0.5 -top-0.5 flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-accent px-1.5 text-xs font-extrabold text-accent-foreground ring-[3px] ring-background"
-                >
-                  {unread > 9 ? "9+" : unread}
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </IconButton>
-        </motion.div>
+            <Avatar src={profile?.avatar_url} name={profile?.display_name || profile?.username} size="h-11 w-11" />
+          </motion.button>
+
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ ...spring.bouncy, delay: 0.16 }}
+            className="pointer-events-auto"
+          >
+            <IconButton
+              label={unread ? `Messages, ${unread} unread` : "Messages"}
+              variant="glass"
+              size="lg"
+              onClick={() => navigate("/messages")}
+            >
+              <MessageCircle className="h-6 w-6" strokeWidth={2.2} />
+              <AnimatePresence>
+                {unread > 0 && (
+                  <motion.span
+                    key={unread}
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    exit={{ scale: 0 }}
+                    transition={spring.bouncy}
+                    className="absolute -right-0.5 -top-0.5 flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-accent px-1.5 text-xs font-extrabold text-accent-foreground ring-[3px] ring-background"
+                  >
+                    {unread > 9 ? "9+" : unread}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </IconButton>
+          </motion.div>
+        </div>
       </div>
 
-      {/* Bottom: create (centre), the "you're here" card and search */}
+      {/* Bottom: create (centre) and the "you're here" card */}
       <div className="pointer-events-none absolute inset-x-0 bottom-safe z-30 mx-auto flex max-w-lg flex-col gap-3 px-4">
         <div className="grid grid-cols-[1fr_auto_1fr] items-end">
           {/* Back to you: only shown once you've panned away (or location failed). */}
@@ -295,22 +324,6 @@ export default function MapPage({ active }: { active: boolean }) {
             </motion.div>
           )}
         </AnimatePresence>
-
-        <motion.button
-          type="button"
-          onClick={() => setSearchOpen(true)}
-          initial={{ y: 80, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          whileTap={{ scale: 0.97 }}
-          transition={{ ...spring.snappy, delay: 0.05 }}
-          className="glass pointer-events-auto flex h-[60px] w-full items-center gap-3 rounded-full px-5 text-left"
-        >
-          <Search className="h-5 w-5 text-accent" strokeWidth={2.6} />
-          <span className="flex-1 text-[16px] font-semibold text-muted-foreground">Search happs or people</span>
-          {liveHapps.length > 0 && (
-            <span className="rounded-full bg-accent/15 px-2.5 py-1 text-xs font-bold text-accent">{liveHapps.length} live</span>
-          )}
-        </motion.button>
       </div>
 
       <HappSheet
@@ -322,7 +335,13 @@ export default function MapPage({ active }: { active: boolean }) {
           loadHapps();
         }}
       />
-      <SearchSheet open={searchOpen && active} onClose={() => setSearchOpen(false)} happs={happs} location={location} now={now} />
+      <SearchSheet
+        open={searchOpen && active}
+        onClose={() => setSearchOpen(false)}
+        happs={happs}
+        location={location}
+        now={now}
+      />
 
       <Sheet
         open={confirmOpen && active}
