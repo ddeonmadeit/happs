@@ -194,10 +194,10 @@ and `MAP_CENTER` in `src/lib/constants.ts` to open it up.
   each other, and a hot spot follows your finger when you slide it across
   (`src/lib/glitch.ts`). The logo mark is a plain gold gradient with the same
   moving colour.
-- **Welcome sonar:** the four tips of the logo take turns sending out sonar
-  pings (a soft beam with wavefronts), and echo blips of different sizes
-  light up where the waves reach them and fade (`src/components/Sonar.tsx`,
-  one canvas, off with reduced motion).
+- **Welcome radar:** a ship's-radar line sweeps clockwise around the logo
+  with a fading afterglow over faint range rings; contacts of different sizes
+  light up as it passes and fade away (`src/components/Radar.tsx`, one
+  canvas, off with reduced motion).
 - **Map markers** glow in the main colour of each happ's picture. Where happs
   overlap, tapping the stack fans them out with their names so you can pick
   one.

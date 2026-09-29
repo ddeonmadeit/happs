@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { Button } from "@/components/ui/Button";
 import { HappsMark, Wordmark } from "@/components/Logo";
 import { spring } from "@/components/motion";
-import { Sonar } from "@/components/Sonar";
+import { Radar } from "@/components/Radar";
 
 /** First screen for signed-out visitors. Signed-in users go straight to the map. */
 export default function Welcome() {
@@ -18,8 +18,8 @@ export default function Welcome() {
       exit={{ opacity: 0, transition: { duration: 0.2 } }}
       className="absolute inset-0 z-40 flex flex-col items-center overflow-hidden bg-app px-6 pb-safe pt-safe"
     >
-      {/* Sonar pings from the tips of the logo. */}
-      <Sonar anchor={markRef} className="pointer-events-none absolute inset-0 h-full w-full" />
+      {/* A radar sweep turning around the logo. */}
+      <Radar anchor={markRef} className="pointer-events-none absolute inset-0 h-full w-full" />
 
       <div className="relative flex flex-1 flex-col items-center justify-center">
         <motion.div
