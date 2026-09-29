@@ -18,15 +18,18 @@ cleanupOutdatedCaches();
 // Single-page app: serve index.html for navigations.
 registerRoute(new NavigationRoute(createHandlerBoundToURL("index.html"), { denylist: [/^\/~/, /\/[^/?]+\.[^/]+$/] }));
 
-// Uploaded images never change (every upload has a unique name), so cache them.
+// Uploaded images and their thumbnails never change (every upload has a
+// unique name), so cache them. The app loads them with CORS, so these are
+// normal (not opaque) responses.
 // The old worker cached *all* Supabase GET requests, including API data, which
 // could show stale or another account's data.
 registerRoute(
   ({ url, request }) =>
-    request.destination === "image" && url.pathname.startsWith("/storage/v1/object/public/"),
+    request.destination === "image" &&
+    (url.pathname.startsWith("/storage/v1/object/public/") || url.pathname.startsWith("/storage/v1/render/image/public/")),
   new CacheFirst({
     cacheName: "happs-media",
-    plugins: [new ExpirationPlugin({ maxEntries: 300, maxAgeSeconds: 30 * 24 * 60 * 60 })],
+    plugins: [new ExpirationPlugin({ maxEntries: 600, maxAgeSeconds: 30 * 24 * 60 * 60 })],
   }),
 );
 

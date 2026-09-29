@@ -15,26 +15,40 @@ import { Sheet } from "@/components/ui/Sheet";
 import { FullScreenLoader, Spinner } from "@/components/ui/Spinner";
 import { Screen, Stagger, StaggerItem, spring } from "@/components/motion";
 import { fetchJoinedHapps, getOrCreateConversation, isVideoPost } from "@/lib/api";
+import { readCache, writeCache } from "@/lib/cache";
+import { useThumb } from "@/hooks/useThumb";
+import { posterUrl } from "@/lib/media";
 import { normalizeUsername, validateUsername } from "@/lib/constants";
 import { resizeImage, uploadMedia } from "@/lib/media";
 import { cn, errorMessage, shortTimeAgo } from "@/lib/utils";
 
 type GridPost = { id: string; media_url: string; media_type: string; happ_id: string };
 type JoinedHapp = HappRow;
+type ProfileData = {
+  profile: ProfileRow | null;
+  posts: GridPost[];
+  stats: { followers: number; following: number };
+  isFollowing: boolean;
+};
+
+export const profileCacheKey = (userId: string) => `profile:${userId}`;
 
 export default function Profile() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
-  const { user, setProfile: setOwnProfile } = useAuth();
+  const { user, profile: ownProfile, setProfile: setOwnProfile } = useAuth();
   const targetId = userId ?? user?.id;
   const isOwn = !userId || userId === user?.id;
 
-  const [profile, setProfile] = useState<ProfileRow | null>(null);
-  const [posts, setPosts] = useState<GridPost[]>([]);
+  // Show what we had last time (or your own profile from sign-in) straight
+  // away, and refresh underneath.
+  const cached = targetId ? readCache<ProfileData>(profileCacheKey(targetId), { persist: isOwn }) : undefined;
+  const [profile, setProfile] = useState<ProfileRow | null>(cached?.profile ?? (isOwn ? ownProfile : null));
+  const [posts, setPosts] = useState<GridPost[] | null>(cached?.posts ?? null);
   const [happs, setHapps] = useState<JoinedHapp[] | null>(null);
-  const [stats, setStats] = useState({ followers: 0, following: 0 });
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState(cached?.stats ?? { followers: 0, following: 0 });
+  const [isFollowing, setIsFollowing] = useState(cached?.isFollowing ?? false);
+  const [loading, setLoading] = useState(!cached && !(isOwn && ownProfile));
   const [tab, setTab] = useState<"posts" | "happs">("posts");
   const [editOpen, setEditOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -46,7 +60,6 @@ export default function Profile() {
   useEffect(() => {
     if (!targetId) return;
     let cancelled = false;
-    setLoading(true);
     setTab("posts");
     setHapps(null);
     (async () => {
@@ -64,10 +77,17 @@ export default function Profile() {
           : Promise.resolve({ data: null }),
       ]);
       if (cancelled) return;
-      setProfile(profileRes.data);
-      setPosts((postsRes.data as GridPost[]) ?? []);
-      setStats({ followers: followersRes.count ?? 0, following: followingRes.count ?? 0 });
-      setIsFollowing(Boolean(followRes.data));
+      const fresh: ProfileData = {
+        profile: profileRes.data,
+        posts: (postsRes.data as GridPost[]) ?? [],
+        stats: { followers: followersRes.count ?? 0, following: followingRes.count ?? 0 },
+        isFollowing: Boolean(followRes.data),
+      };
+      if (!profileRes.error) writeCache(profileCacheKey(targetId), fresh, { persist: isOwn });
+      setProfile(fresh.profile);
+      setPosts(fresh.posts);
+      setStats(fresh.stats);
+      setIsFollowing(fresh.isFollowing);
       setLoading(false);
     })();
     return () => {
@@ -190,7 +210,7 @@ export default function Profile() {
             </div>
             <dl className="grid flex-1 grid-cols-3 text-center">
               {[
-                ["Posts", posts.length],
+                ["Posts", posts?.length ?? "–"],
                 ["Followers", stats.followers],
                 ["Following", stats.following],
               ].map(([label, value]) => (
@@ -256,7 +276,13 @@ export default function Profile() {
         </div>
 
         {tab === "posts" ? (
-          posts.length === 0 ? (
+          posts === null ? (
+            <div className="grid grid-cols-3 gap-1 px-1 pt-2">
+              {Array.from({ length: 6 }, (_, i) => (
+                <div key={i} className="aspect-square animate-pulse rounded-2xl bg-muted" />
+              ))}
+            </div>
+          ) : posts.length === 0 ? (
             <EmptyTab icon={<Grid3X3 className="h-8 w-8" />} text={isOwn ? "Your posts will show up here" : "No posts yet"} />
           ) : (
             <Stagger as="div" className="grid grid-cols-3 gap-1 px-1 pb-safe pt-2">
@@ -266,14 +292,7 @@ export default function Profile() {
                   to={`/happ/${p.happ_id}/story/${targetId}?post=${p.id}`}
                   className="relative block aspect-square overflow-hidden rounded-2xl bg-muted"
                 >
-                  {isVideoPost(p) ? (
-                    <>
-                      <video src={`${p.media_url}#t=0.1`} className="h-full w-full object-cover" muted playsInline preload="metadata" />
-                      <Play className="absolute right-2 top-2 h-4 w-4 fill-white text-white drop-shadow" />
-                    </>
-                  ) : (
-                    <img src={p.media_url} alt="" loading="lazy" className="h-full w-full object-cover" />
-                  )}
+                  <PostTile post={p} />
                 </Link>
                 </StaggerItem>
               ))}
@@ -321,6 +340,32 @@ export default function Profile() {
         </>
       )}
     </Screen>
+  );
+}
+
+/** A grid square: a small thumbnail (a poster frame for videos). */
+function PostTile({ post }: { post: GridPost }) {
+  const video = isVideoPost(post);
+  const image = useThumb(video ? posterUrl(post.media_url) : post.media_url, 140, { square: true });
+  return (
+    <>
+      {video && image.failed ? (
+        <video src={`${post.media_url}#t=0.1`} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+      ) : (
+        image.src && (
+          <img
+            src={image.src}
+            alt=""
+            crossOrigin="anonymous"
+            decoding="async"
+            className="h-full w-full object-cover"
+            onLoad={image.onLoad}
+            onError={image.onError}
+          />
+        )
+      )}
+      {video && <Play className="absolute right-2 top-2 h-4 w-4 fill-white text-white drop-shadow" />}
+    </>
   );
 }
 

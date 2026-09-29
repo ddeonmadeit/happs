@@ -4,13 +4,15 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { AnimatePresence, motion } from "motion/react";
 import { LocateFixed, MapPin, Search, X } from "lucide-react";
 import { toast } from "sonner";
-import { getMapboxToken, reverseGeocode, searchPlaces, type Place } from "@/lib/mapbox";
+import { getMapboxToken, reverseAddress, searchPlaces, type Place } from "@/lib/mapbox";
+import { distanceMeters } from "@/lib/utils";
 import { MAP_BOUNDS, MAP_CENTER, MAP_STYLE } from "@/lib/constants";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { Pressable, spring } from "@/components/motion";
 import type { Coordinates } from "@/hooks/useGeolocation";
 
+/** `suburb` holds the full location label: street address (or venue) and suburb. */
 export type PickedLocation = { latitude: number; longitude: number; suburb: string };
 
 type Props = {
@@ -54,15 +56,23 @@ function PickerBody({ initial, onClose, onPick, locate }: Omit<Props, "open">) {
   const [failed, setFailed] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const lookup = useRef(0);
+  /** A searched venue/address keeps its own name while the pin stays on it. */
+  const chosen = useRef<{ latitude: number; longitude: number; label: string } | null>(null);
 
-  // Name the spot under the pin whenever the map settles.
+  // Name the spot under the pin (its street address) whenever the map settles.
   const describeCenter = () => {
     const map = mapRef.current;
     if (!map) return;
     const { lat, lng } = map.getCenter();
     const id = ++lookup.current;
+    const pick = chosen.current;
+    if (pick && distanceMeters(lat, lng, pick.latitude, pick.longitude) < 25) {
+      setLabel(pick.label);
+      return;
+    }
+    chosen.current = null;
     setLabel(null);
-    reverseGeocode(lat, lng).then((place) => {
+    reverseAddress(lat, lng).then((place) => {
       if (id === lookup.current) setLabel(place ?? "Pinned location");
     });
   };
@@ -135,6 +145,9 @@ function PickerBody({ initial, onClose, onPick, locate }: Omit<Props, "open">) {
     setQuery("");
     setResults([]);
     (document.activeElement as HTMLElement | null)?.blur();
+    // "Sydney Opera House, Bennelong Point, Sydney NSW 2000"; an address result is already complete.
+    const label = place.address.startsWith(place.name) ? place.address : [place.name, place.address].filter(Boolean).join(", ");
+    chosen.current = { latitude: place.latitude, longitude: place.longitude, label };
     flyTo(place);
   };
 
@@ -149,7 +162,7 @@ function PickerBody({ initial, onClose, onPick, locate }: Omit<Props, "open">) {
     if (!map) return;
     const { lat, lng } = map.getCenter();
     setConfirming(true);
-    const suburb = label ?? (await reverseGeocode(lat, lng)) ?? "Pinned location";
+    const suburb = label ?? (await reverseAddress(lat, lng)) ?? "Pinned location";
     onPick({ latitude: lat, longitude: lng, suburb });
   };
 
@@ -257,7 +270,7 @@ function PickerBody({ initial, onClose, onPick, locate }: Omit<Props, "open">) {
             <MapPin className="h-5 w-5 shrink-0 text-accent" />
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Happ location</p>
-              <p className="truncate text-[16px] font-extrabold">
+              <p className="line-clamp-2 text-[16px] font-extrabold leading-snug">
                 {moving ? "Move the map to place the pin" : (label ?? "Finding the address…")}
               </p>
             </div>

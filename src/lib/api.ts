@@ -11,17 +11,37 @@
  * relies on embedding `profiles`, so every read works on both.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { posterPath, storagePath } from "@/lib/media";
 import type { ConversationSummaryRow, HappRow, PostRow, ProfileRow } from "@/integrations/supabase/types";
 
 type Mode = "modern" | "legacy";
 let modePromise: Promise<Mode> | null = null;
 
+const MODE_KEY = `happs:backend:${import.meta.env.VITE_SUPABASE_URL ?? ""}`;
+
 export function backendMode(): Promise<Mode> {
+  if (modePromise) return modePromise;
   // get_map_happs is callable by everyone, so this works before sign-in too.
-  modePromise ??= Promise.resolve(supabase.rpc("get_map_happs")).then(
-    ({ error }) => (error?.code === "PGRST202" ? "legacy" : "modern"),
+  const detect = Promise.resolve(supabase.rpc("get_map_happs")).then(
+    ({ error }) => {
+      const mode: Mode = error?.code === "PGRST202" ? "legacy" : "modern";
+      try {
+        localStorage.setItem(MODE_KEY, mode);
+      } catch {
+        // storage unavailable
+      }
+      return mode;
+    },
     () => "modern" as const,
   );
+  // Remembered from last time, so launches skip a round trip (re-checked in the background).
+  let saved: string | null = null;
+  try {
+    saved = localStorage.getItem(MODE_KEY);
+  } catch {
+    // storage unavailable
+  }
+  modePromise = saved === "legacy" || saved === "modern" ? Promise.resolve(saved) : detect;
   return modePromise;
 }
 
@@ -109,21 +129,22 @@ export async function fetchMapHapps(): Promise<MapHapp[]> {
     }));
   }
 
-  const { data, error } = await supabase
-    .from("happs")
-    .select("id, name, latitude, longitude, suburb, icon_url, is_active, participant_count, last_activity_at, created_at")
-    .gt("created_at", iso(24 * 3600_000))
-    .or(`last_activity_at.gt.${iso(2 * 3600_000)},created_at.gt.${iso(2 * 3600_000)}`)
-    .order("last_activity_at", { ascending: false })
-    .limit(300);
+  // Both at once: every post on a map happ is from the last 24 h, since the
+  // happ itself is.
+  const [{ data, error }, { data: recentPosts }] = await Promise.all([
+    supabase
+      .from("happs")
+      .select("id, name, latitude, longitude, suburb, icon_url, is_active, participant_count, last_activity_at, created_at")
+      .gt("created_at", iso(24 * 3600_000))
+      .or(`last_activity_at.gt.${iso(2 * 3600_000)},created_at.gt.${iso(2 * 3600_000)}`)
+      .order("last_activity_at", { ascending: false })
+      .limit(300),
+    supabase.from("posts").select("happ_id").gt("created_at", iso(24 * 3600_000)).limit(5000),
+  ]);
   if (error) fail(error);
   const happs = data ?? [];
-  const posts = await inChunks<{ happ_id: string }>(
-    happs.map((h) => h.id),
-    (chunk) => supabase.from("posts").select("happ_id").in("happ_id", chunk),
-  );
   const counts = new Map<string, number>();
-  posts.forEach((p) => counts.set(p.happ_id, (counts.get(p.happ_id) ?? 0) + 1));
+  (recentPosts ?? []).forEach((p) => counts.set(p.happ_id, (counts.get(p.happ_id) ?? 0) + 1));
   return happs.map((h) => ({
     id: h.id,
     name: h.name,
@@ -352,6 +373,24 @@ export async function createPost(post: NewPost, userId: string) {
   }
   if (rejected) throw new Error(`The database wouldn’t accept this ${post.media_type === "video" ? "video" : "photo"}. Please try again.`);
   if (legacy) await supabase.from("happs").update({ last_activity_at: iso(), is_active: true }).eq("id", post.happ_id);
+}
+
+/** Delete one of your own posts (and its file). */
+export async function deletePost(post: { id: string; media_url: string }, userId: string) {
+  const attempt = () => supabase.from("posts").delete().eq("id", post.id).eq("user_id", userId).select("id");
+  let { data, error } = await attempt();
+  if (error?.code === "23503") {
+    // No cascading deletes on the original backend: clear our own reactions and retry.
+    await Promise.all([
+      supabase.from("comments").delete().eq("post_id", post.id).eq("user_id", userId),
+      supabase.from("post_likes").delete().eq("post_id", post.id).eq("user_id", userId),
+    ]);
+    ({ data, error } = await attempt());
+  }
+  if (error) fail(error.code === "23503" ? new Error("People have reacted to this post, so it can’t be deleted yet") : error);
+  if (!data?.length) fail(new Error("You can only delete your own posts"));
+  const path = storagePath(post.media_url);
+  if (path) void supabase.storage.from("media").remove([path, posterPath(path)]);
 }
 
 // ---------------------------------------------------------------------------

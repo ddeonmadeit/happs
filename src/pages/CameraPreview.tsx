@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/Button";
 import { Screen } from "@/components/motion";
 import { createHapp, createPost } from "@/lib/api";
 import { draftStore, useDraft } from "@/lib/draft";
-import { uploadMedia } from "@/lib/media";
+import { uploadMedia, uploadPoster, videoPoster } from "@/lib/media";
+import { forgetCache } from "@/lib/cache";
 import { requestPush } from "@/lib/push";
 import { errorMessage } from "@/lib/utils";
 
@@ -54,6 +55,10 @@ export default function CameraPreview() {
     try {
       setStatus(media.type === "video" ? "Uploading video…" : "Uploading photo…");
       const mediaUrl = await uploadMedia(user.id, media.blob, media.type === "video" ? "video" : "photo");
+      // Videos get a poster frame so grids can show a small picture instead of loading the clip.
+      if (media.type === "video") {
+        void videoPoster(media.blob).then((poster) => poster && uploadPoster(mediaUrl, poster).catch(() => undefined));
+      }
 
       let happId: string;
       if (target.kind === "existing") {
@@ -86,6 +91,7 @@ export default function CameraPreview() {
       const isNew = target.kind === "new" || target.justCreated;
       if (isNew) requestPush({ type: "happ", happ_id: happId });
 
+      forgetCache(`profile:${user.id}`);
       done.current = true;
       toast.success(isNew ? "Your happ is live!" : "Posted!");
       navigate(`/happ/${happId}`, { replace: true });

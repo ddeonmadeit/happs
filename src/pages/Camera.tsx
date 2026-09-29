@@ -15,6 +15,35 @@ import { cn } from "@/lib/utils";
 type Mode = "photo" | "video";
 type Facing = "environment" | "user";
 
+/** Resolves when the video has shown a new frame (or after 120 ms at most). */
+function nextFrame(video: HTMLVideoElement) {
+  return new Promise<void>((resolve) => {
+    const done = () => resolve();
+    const withCallback = video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
+    if (withCallback.requestVideoFrameCallback) withCallback.requestVideoFrameCallback(done);
+    else requestAnimationFrame(done);
+    setTimeout(done, 120);
+  });
+}
+
+/**
+ * True if a captured frame is (nearly) pure black. iPhones hand out black
+ * frames for a moment while the camera starts and sets its exposure, which is
+ * how a photo could come out completely black.
+ */
+function isBlankFrame(source: HTMLCanvasElement) {
+  const probe = document.createElement("canvas");
+  probe.width = 24;
+  probe.height = 24;
+  const ctx = probe.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return false;
+  ctx.drawImage(source, 0, 0, 24, 24);
+  const { data } = ctx.getImageData(0, 0, 24, 24);
+  let max = 0;
+  for (let i = 0; i < data.length; i += 4) max = Math.max(max, data[i], data[i + 1], data[i + 2]);
+  return max < 16;
+}
+
 function videoDuration(file: Blob) {
   return new Promise<number>((resolve) => {
     const url = URL.createObjectURL(file);
@@ -98,11 +127,14 @@ export default function Camera() {
         return;
       }
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => undefined);
+      const el = videoRef.current;
+      if (el) {
+        el.srcObject = stream;
+        await el.play().catch(() => undefined);
+        // Only enable the shutter once real frames are coming through.
+        for (let i = 0; i < 3 && !cancelled; i++) await nextFrame(el);
       }
-      setStatus("ready");
+      if (!cancelled) setStatus("ready");
     })();
     return () => {
       cancelled = true;
@@ -126,20 +158,35 @@ export default function Camera() {
     navigate("/camera/preview");
   };
 
-  const takePhoto = () => {
+  const capturing = useRef(false);
+
+  const takePhoto = async () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas || !video.videoWidth) return;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    if (!video || !canvas || !video.videoWidth || capturing.current) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    if (facing === "user") {
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
+    capturing.current = true;
+    try {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      if (facing === "user") {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+      }
+      // Keep grabbing frames (for up to ~2 s) while the camera is still
+      // handing out black ones.
+      for (let i = 0; i < 16; i++) {
+        ctx.drawImage(video, 0, 0);
+        if (!isBlankFrame(canvas)) break;
+        await nextFrame(video);
+      }
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+      if (blob) finish(blob, "image");
+    } finally {
+      capturing.current = false;
     }
-    ctx.drawImage(video, 0, 0);
-    canvas.toBlob((blob) => blob && finish(blob, "image"), "image/jpeg", 0.9);
   };
 
   const stopRecording = useCallback(() => {

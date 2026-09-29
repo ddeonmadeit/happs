@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { MAP_BOUNDS } from "@/lib/constants";
+import { distanceMeters } from "@/lib/utils";
 
 let tokenPromise: Promise<string | null> | null = null;
 
@@ -45,6 +46,35 @@ export async function reverseGeocode(latitude: number, longitude: number): Promi
     return tail ? `${feature.text}, ${tail}` : feature.text;
   } catch {
     return null;
+  }
+}
+
+type AddressFeature = GeocodeFeature & { address?: string; center?: [number, number] };
+
+/**
+ * The street address at a point, e.g. "213 Commonwealth Street, Surry Hills
+ * NSW 2010". Falls back to the suburb when there's no address nearby (a
+ * park, the beach…).
+ */
+export async function reverseAddress(latitude: number, longitude: number): Promise<string | null> {
+  const token = await getMapboxToken();
+  if (!token) return null;
+  try {
+    const res = await fetch(
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?types=address&limit=1&access_token=${token}`,
+    );
+    const feature: AddressFeature | undefined = res.ok ? (await res.json()).features?.[0] : undefined;
+    const near =
+      feature?.center && distanceMeters(latitude, longitude, feature.center[1], feature.center[0]) < 120;
+    if (!feature?.text || !near) return reverseGeocode(latitude, longitude);
+    const street = feature.address ? `${feature.address} ${feature.text}` : feature.text;
+    const find = (kind: string) => feature.context?.find((c) => c.id.startsWith(kind));
+    const region = find("region");
+    const state = region?.short_code?.split("-").pop()?.toUpperCase() ?? region?.text;
+    const area = [(find("locality") ?? find("place"))?.text, state, find("postcode")?.text].filter(Boolean).join(" ");
+    return area ? `${street}, ${area}` : street;
+  } catch {
+    return reverseGeocode(latitude, longitude);
   }
 }
 

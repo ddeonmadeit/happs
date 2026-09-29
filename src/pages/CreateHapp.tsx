@@ -14,7 +14,7 @@ import { LocationPicker, type PickedLocation } from "@/components/LocationPicker
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { createHapp } from "@/lib/api";
 import { draftStore, useDraft } from "@/lib/draft";
-import { reverseGeocode } from "@/lib/mapbox";
+import { reverseAddress } from "@/lib/mapbox";
 import { resizeImage, uploadMedia } from "@/lib/media";
 import { cn, errorMessage, formatStart, startsIn } from "@/lib/utils";
 
@@ -59,8 +59,11 @@ export default function CreateHapp() {
   const [picked, setPicked] = useState<PickedLocation | null>(
     previous ? { latitude: previous.latitude, longitude: previous.longitude, suburb: previous.suburb } : null,
   );
-  const [gpsSuburb, setGpsSuburb] = useState<string | null>(null);
+  const [gpsAddress, setGpsAddress] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // The street address people see; filled in from the map, and editable (unit, level…).
+  const [address, setAddress] = useState(previous?.suburb ?? "");
+  const [addressEdited, setAddressEdited] = useState(Boolean(previous));
 
   // When: now, or a date and time.
   const initialStart = previous?.startsAt ? new Date(previous.startsAt) : defaultStart();
@@ -72,15 +75,20 @@ export default function CreateHapp() {
   useEffect(() => {
     if (!gps || picked) return;
     let cancelled = false;
-    reverseGeocode(gps.latitude, gps.longitude).then((place) => {
-      if (!cancelled) setGpsSuburb(place ?? "Current location");
+    reverseAddress(gps.latitude, gps.longitude).then((place) => {
+      if (!cancelled) setGpsAddress(place ?? "Current location");
     });
     return () => {
       cancelled = true;
     };
   }, [gps, picked]);
 
-  const place = picked ?? (gps ? { latitude: gps.latitude, longitude: gps.longitude, suburb: gpsSuburb ?? "Current location" } : null);
+  const place = picked ?? (gps ? { latitude: gps.latitude, longitude: gps.longitude, suburb: gpsAddress ?? "" } : null);
+
+  // Keep the address in step with the pin until you type your own.
+  useEffect(() => {
+    if (!addressEdited && place?.suburb) setAddress(place.suburb);
+  }, [place?.suburb, addressEdited]);
 
   const start = useMemo(() => {
     if (when === "now") return null;
@@ -122,7 +130,7 @@ export default function CreateHapp() {
       description: description.trim(),
       latitude: place.latitude,
       longitude: place.longitude,
-      suburb: place.suburb,
+      suburb: address.trim() || place.suburb || "Pinned location",
       startsAt: start ? start.toISOString() : null,
     };
 
@@ -160,7 +168,6 @@ export default function CreateHapp() {
     }
   };
 
-  const whereLabel = place ? place.suburb : locating ? null : "Choose where it’s happening";
 
   return (
     <Screen>
@@ -286,27 +293,46 @@ export default function CreateHapp() {
             </AnimatePresence>
           </Field>
 
-          <Field label="Where" hint={picked ? "Pinned on the map" : place ? "Your current location" : null}>
-            <motion.button
-              type="button"
-              onClick={() => setPickerOpen(true)}
-              aria-label={`Where: ${whereLabel ?? "finding your location"}. Change`}
-              whileTap={{ scale: 0.97 }}
-              transition={spring.bouncy}
-              className="flex h-[52px] w-full items-center gap-3 rounded-2xl bg-muted px-4 text-left text-[15px]"
-            >
+          <Field
+            label="Where"
+            htmlFor="happ-address"
+            hint={
+              place
+                ? `${picked ? "Pinned on the map" : "Your current location"} · add a unit or level if it helps`
+                : null
+            }
+          >
+            <div className="flex h-[52px] items-center gap-2 rounded-2xl border-2 border-transparent bg-muted pl-4 pr-1.5 transition-colors focus-within:border-accent/70">
               <MapPin className="h-5 w-5 shrink-0 text-accent" />
-              {whereLabel === null ? (
-                <span className="flex flex-1 items-center gap-2 text-muted-foreground">
+              {!place && locating ? (
+                <span className="flex flex-1 items-center gap-2 text-[15px] text-muted-foreground">
                   <Spinner className="h-4 w-4" /> Finding you…
                 </span>
               ) : (
-                <span className={cn("flex-1 truncate font-semibold", !place && "text-muted-foreground")}>{whereLabel}</span>
+                <input
+                  id="happ-address"
+                  value={address}
+                  onChange={(e) => {
+                    setAddress(e.target.value);
+                    setAddressEdited(true);
+                  }}
+                  maxLength={140}
+                  placeholder={place ? "Street address" : "Choose where it’s happening"}
+                  autoComplete="off"
+                  className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold placeholder:font-normal placeholder:text-muted-foreground focus:outline-none"
+                />
               )}
-              <span className="flex items-center text-sm font-bold text-accent">
-                Change <ChevronRight className="h-4 w-4" strokeWidth={2.6} />
-              </span>
-            </motion.button>
+              <motion.button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                aria-label="Choose on the map"
+                whileTap={{ scale: 0.92 }}
+                transition={spring.bouncy}
+                className="flex h-10 shrink-0 items-center gap-1 rounded-xl bg-white/[0.06] px-3 text-sm font-bold text-accent"
+              >
+                Map <ChevronRight className="h-4 w-4" strokeWidth={2.6} />
+              </motion.button>
+            </div>
           </Field>
           <div className="h-4" />
         </div>
@@ -325,6 +351,8 @@ export default function CreateHapp() {
         onClose={() => setPickerOpen(false)}
         onPick={(loc) => {
           setPicked(loc);
+          setAddress(loc.suburb);
+          setAddressEdited(false);
           setPickerOpen(false);
         }}
       />

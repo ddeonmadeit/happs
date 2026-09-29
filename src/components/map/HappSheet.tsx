@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { CalendarClock, Camera, Clock, Trash2, Users } from "lucide-react";
+import { CalendarClock, Camera, Clock, MapPin, Navigation, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import type { HappRow } from "@/integrations/supabase/types";
 import { deleteHapp, fetchHapp, fetchParticipants, happStartsAt, isUpcoming, type Participant } from "@/lib/api";
@@ -15,6 +15,15 @@ import { Button, IconButton } from "@/components/ui/Button";
 import { Pressable, spring, Stagger, StaggerItem } from "@/components/motion";
 import { draftStore } from "@/lib/draft";
 import { cn, errorMessage, formatStart, shortTimeAgo, startsIn } from "@/lib/utils";
+
+/** Directions to a happ: Apple Maps on iPhone/iPad, Google Maps elsewhere. */
+function directionsUrl(happ: HappRow) {
+  const at = `${happ.latitude},${happ.longitude}`;
+  const apple = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && "ontouchend" in document;
+  return apple
+    ? `https://maps.apple.com/?daddr=${at}&q=${encodeURIComponent(happ.name)}`
+    : `https://www.google.com/maps/dir/?api=1&destination=${at}`;
+}
 
 type Props = {
   happId: string | null;
@@ -161,12 +170,26 @@ export function HappSheet({ happId, onClose, onLoaded, onDeleted }: Props) {
                       {happ.is_active ? "Live" : "Dead"}
                     </span>
                   )}
-                  {happ.suburb && <span className="truncate text-muted-foreground">{happ.suburb}</span>}
+
                 </div>
               </div>
             </div>
 
             {happ.description && <p className="text-[15px] leading-relaxed text-foreground/80">{happ.description}</p>}
+
+            {/* Where it is, with directions in the phone's maps app. */}
+            <a
+              href={directionsUrl(happ)}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-3 rounded-3xl bg-muted/60 px-4 py-3 active:bg-muted"
+            >
+              <MapPin className="h-5 w-5 shrink-0 text-accent" />
+              <span className="min-w-0 flex-1 text-sm font-semibold leading-snug">{happ.suburb || "Pinned location"}</span>
+              <span className="flex shrink-0 items-center gap-1 text-xs font-bold text-accent">
+                <Navigation className="h-3.5 w-3.5" strokeWidth={2.6} /> Directions
+              </span>
+            </a>
 
             {upcoming && startsAt && (
               <div className="flex items-center gap-3 rounded-3xl bg-muted/60 px-4 py-3">

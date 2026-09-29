@@ -4,6 +4,7 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { MapPinOff } from "lucide-react";
 import { getMapboxToken } from "@/lib/mapbox";
 import { imageColor } from "@/lib/imageColor";
+import { thumbUrl } from "@/lib/media";
 import { MAP_BOUNDS, MAP_CENTER, MAP_STYLE } from "@/lib/constants";
 import { isUpcoming, type MapHapp } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -70,13 +71,22 @@ function renderMarker(entry: MarkerEntry, selected: boolean, upcoming: boolean) 
   if (url) {
     const img = document.createElement("img");
     img.crossOrigin = "anonymous";
-    img.src = url;
+    img.decoding = "async";
     img.alt = "";
     img.draggable = false;
+    // A small thumbnail (falls back to the full picture).
+    img.onerror = () => {
+      img.onerror = null;
+      img.src = url;
+    };
+    img.src = thumbUrl(url, size, { square: true }) ?? url;
     inner.appendChild(img);
-    imageColor(url).then((color) => {
-      if (color && inner.dataset.icon === url) inner.style.setProperty("--happ-color", color);
-    });
+    const tiny = thumbUrl(url, 24, { square: true }) ?? url;
+    imageColor(tiny)
+      .then((color) => color ?? (tiny !== url ? imageColor(url) : null))
+      .then((color) => {
+        if (color && inner.dataset.icon === url) inner.style.setProperty("--happ-color", color);
+      });
   } else {
     const span = document.createElement("span");
     span.textContent = happ.name.charAt(0).toUpperCase();

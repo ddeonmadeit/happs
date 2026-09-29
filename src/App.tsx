@@ -1,4 +1,4 @@
-import { Suspense, type ReactNode } from "react";
+import { Suspense, useEffect, type ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AnimatePresence } from "motion/react";
 import { Toaster } from "sonner";
@@ -12,14 +12,24 @@ import Auth from "@/pages/Auth";
 import SetupRequired from "@/pages/SetupRequired";
 import { lazyPage } from "@/lib/lazyPage";
 
+const screens = {
+  createHapp: () => import("@/pages/CreateHapp"),
+  story: () => import("@/pages/Story"),
+  profile: () => import("@/pages/Profile"),
+  camera: () => import("@/pages/Camera"),
+  cameraPreview: () => import("@/pages/CameraPreview"),
+  messages: () => import("@/pages/Messages"),
+  chat: () => import("@/pages/Chat"),
+};
+
 const MapPage = lazyPage(() => import("@/pages/MapPage"));
-const CreateHapp = lazyPage(() => import("@/pages/CreateHapp"));
-const Story = lazyPage(() => import("@/pages/Story"));
-const Profile = lazyPage(() => import("@/pages/Profile"));
-const Camera = lazyPage(() => import("@/pages/Camera"));
-const CameraPreview = lazyPage(() => import("@/pages/CameraPreview"));
-const Messages = lazyPage(() => import("@/pages/Messages"));
-const Chat = lazyPage(() => import("@/pages/Chat"));
+const CreateHapp = lazyPage(screens.createHapp);
+const Story = lazyPage(screens.story);
+const Profile = lazyPage(screens.profile);
+const Camera = lazyPage(screens.camera);
+const CameraPreview = lazyPage(screens.cameraPreview);
+const Messages = lazyPage(screens.messages);
+const Chat = lazyPage(screens.chat);
 const Install = lazyPage(() => import("@/pages/Install"));
 const NotFound = lazyPage(() => import("@/pages/NotFound"));
 
@@ -39,6 +49,19 @@ function Shell() {
   const { user, profile } = useAuth();
   const signedIn = Boolean(user && profile?.username);
   const onMap = MAP_ROUTE.test(location.pathname);
+
+  // Once the map is up, fetch the other screens in the background so opening
+  // them is instant.
+  useEffect(() => {
+    if (!signedIn) return;
+    const prefetch = () => Object.values(screens).forEach((load) => load().catch(() => undefined));
+    if ("requestIdleCallback" in window) {
+      const id = window.requestIdleCallback(prefetch, { timeout: 4000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = setTimeout(prefetch, 2500);
+    return () => clearTimeout(id);
+  }, [signedIn]);
 
   return (
     <>

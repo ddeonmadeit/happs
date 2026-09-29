@@ -210,6 +210,16 @@ and `MAP_CENTER` in `src/lib/constants.ts` to open it up.
   for stories when they begin.
 - **Put it anywhere:** the happ's location defaults to where you are; tap it to
   drag a pin on a map or search for a venue or address.
+- **Street addresses:** a happ's location is its street address ("213
+  Commonwealth Street, Surry Hills NSW 2010", or a venue name from search),
+  editable for a unit or level, and the happ card links to directions in the
+  phone's maps app. (Stored in the `suburb` column.)
+- **Delete your posts** from the story viewer.
+- **Fast:** photos load as small thumbnails (Supabase image transformations,
+  falling back to the original), videos get a poster frame, your profile and
+  the map show last session's data instantly while they refresh, the other
+  screens load in the background, Inter is self-hosted, and the backend
+  connection is opened while the app boots.
 - **Delete your happs:** the creator gets a delete button on the happ's card.
   (On the original backend, if the database refuses the delete because other
   people have joined, the happ is ended and taken off the map instead.)
@@ -224,6 +234,9 @@ and `MAP_CENTER` in `src/lib/constants.ts` to open it up.
 ### Bugs fixed
 
 **Posting and camera**
+- Photos could come out completely black on iPhone: the shutter grabbed a
+  frame before the camera had started. It now waits for real frames and
+  retries while they're black.
 - Photo posts never saved on the original backend: its `media_type` check
   rejected the label the app sent, and the old app hid the error. Fixed.
 - If a new happ's first post failed, trying again created another copy of the

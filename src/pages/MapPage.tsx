@@ -28,9 +28,12 @@ import {
   type MapHapp,
 } from "@/lib/api";
 import { draftStore } from "@/lib/draft";
+import { readCache, writeCache } from "@/lib/cache";
 import { NEARBY_RADIUS_M } from "@/lib/constants";
 import { cn, distanceMeters, errorMessage } from "@/lib/utils";
 import type { HappRow } from "@/integrations/supabase/types";
+
+const MAP_CACHE = "map-happs";
 
 function nearestHapp(happs: MapHapp[], lat: number, lng: number) {
   let best: MapHapp | null = null;
@@ -63,7 +66,11 @@ export default function MapPage({ active }: { active: boolean }) {
 
   const selectedId = active ? (matchPath("/happ/:id", pathname)?.params.id ?? null) : null;
 
-  const [happs, setHapps] = useState<MapHapp[]>([]);
+  // Last session's happs show instantly while the fresh list loads.
+  const [happs, setHapps] = useState<MapHapp[]>(() => {
+    const saved = readCache<{ at: number; happs: MapHapp[] }>(MAP_CACHE, { persist: true });
+    return saved && Date.now() - saved.at < 6 * 3600_000 ? saved.happs : [];
+  });
   const [dhPressed, setDhPressed] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [voting, setVoting] = useState(false);
@@ -71,7 +78,9 @@ export default function MapPage({ active }: { active: boolean }) {
 
   const loadHapps = useCallback(async () => {
     try {
-      setHapps(await fetchMapHapps());
+      const fresh = await fetchMapHapps();
+      setHapps(fresh);
+      writeCache(MAP_CACHE, { at: Date.now(), happs: fresh }, { persist: true });
     } catch (err) {
       console.error("Error fetching happs:", err);
     }

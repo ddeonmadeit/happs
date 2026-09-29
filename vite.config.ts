@@ -29,6 +29,22 @@ function spaFallback(): Plugin {
   };
 }
 
+/** Open the connection to the backend while the app is still loading. */
+function preconnectBackend(): Plugin {
+  let url = "";
+  return {
+    name: "preconnect-backend",
+    configResolved(config) {
+      url = config.env.VITE_SUPABASE_URL ?? "";
+    },
+    transformIndexHtml(html) {
+      if (!/^https:\/\//.test(url)) return html;
+      const origin = new URL(url).origin;
+      return html.replace("</head>", `    <link rel="preconnect" href="${origin}" crossorigin />\n  </head>`);
+    },
+  };
+}
+
 export default defineConfig({
   base,
   server: { host: true, port: 8080 },
@@ -43,7 +59,8 @@ export default defineConfig({
       injectRegister: "auto",
       injectManifest: {
         globPatterns: ["**/*.{js,css,html,svg,png,ico,ttf,woff2,webp}"],
-        globIgnores: ["splash/**", "404.html"],
+        // Only the Latin cut of Inter is precached; other scripts load on demand.
+        globIgnores: ["splash/**", "404.html", "**/inter-{cyrillic,cyrillic-ext,greek,greek-ext,vietnamese,latin-ext}-*"],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
       manifest: {
@@ -69,6 +86,7 @@ export default defineConfig({
       devOptions: { enabled: false, type: "module" },
     }),
     spaFallback(),
+    preconnectBackend(),
   ],
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion, type PanInfo } from "motion/react";
-import { Heart, MessageCircle, Send, Volume2, VolumeX, X } from "lucide-react";
+import { Heart, MessageCircle, Send, Trash2, Volume2, VolumeX, X } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGoBack } from "@/components/TopBar";
@@ -12,6 +12,7 @@ import { FullScreenLoader, Spinner } from "@/components/ui/Spinner";
 import { Stagger, StaggerItem, spring } from "@/components/motion";
 import {
   addComment,
+  deletePost,
   fetchComments,
   fetchHapp,
   fetchProfiles,
@@ -22,7 +23,10 @@ import {
   type ProfileLite,
   type StoryPost,
 } from "@/lib/api";
-import { cn, shortTimeAgo } from "@/lib/utils";
+import { cn, errorMessage, shortTimeAgo } from "@/lib/utils";
+import { forgetCache } from "@/lib/cache";
+import { thumbUrl } from "@/lib/media";
+import { useThumb } from "@/hooks/useThumb";
 
 export default function Story() {
   const { id: happId, storyId: authorId } = useParams<{ id: string; storyId: string }>();
@@ -39,6 +43,8 @@ export default function Story() {
   const [muted, setMuted] = useState(true);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [heartBurst, setHeartBurst] = useState(0);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const liking = useRef(false);
 
   useEffect(() => {
@@ -65,6 +71,17 @@ export default function Story() {
   }, [happId, authorId, user, params]);
 
   const post = posts[index];
+
+  // Warm up the neighbouring posts so swiping is instant.
+  useEffect(() => {
+    for (const p of [posts[index + 1], posts[index - 1]]) {
+      if (p && !isVideoPost(p)) {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = thumbUrl(p.media_url, STORY_WIDTH, { quality: 80 }) ?? p.media_url;
+      }
+    }
+  }, [posts, index]);
 
   const go = useCallback(
     (delta: number) =>
@@ -105,6 +122,28 @@ export default function Story() {
       toast.error("Couldn't update like");
     }
     liking.current = false;
+  };
+
+  const removePost = async () => {
+    if (!user || !post) return;
+    setDeleting(true);
+    try {
+      await deletePost(post, user.id);
+      forgetCache(`profile:${user.id}`);
+      toast.success("Post deleted");
+      setConfirmDelete(false);
+      const rest = posts.filter((p) => p.id !== post.id);
+      if (rest.length === 0) {
+        close();
+        return;
+      }
+      setPosts(rest);
+      setPage(([i]) => [Math.min(i, rest.length - 1), 0]);
+    } catch (err) {
+      toast.error(errorMessage(err, "Couldn’t delete this post"));
+    } finally {
+      setDeleting(false);
+    }
   };
 
   // Swipe: down closes, left/right changes post.
@@ -164,7 +203,7 @@ export default function Story() {
             {isVideoPost(post) ? (
               <video src={post.media_url} className="h-full w-full object-contain" autoPlay playsInline loop muted={muted} />
             ) : (
-              <img src={post.media_url} alt={post.caption ?? "Post"} className="h-full w-full object-contain" draggable={false} />
+              <StoryImage url={post.media_url} alt={post.caption ?? "Post"} />
             )}
           </motion.div>
         </AnimatePresence>
@@ -217,6 +256,15 @@ export default function Story() {
           {isVideoPost(post) && (
             <IconButton label={muted ? "Unmute" : "Mute"} className="bg-white/15 text-white backdrop-blur-md" onClick={() => setMuted((m) => !m)}>
               {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+            </IconButton>
+          )}
+          {user?.id === post.user_id && (
+            <IconButton
+              label="Delete this post"
+              className="bg-white/15 text-white backdrop-blur-md"
+              onClick={() => setConfirmDelete(true)}
+            >
+              <Trash2 className="h-5 w-5" />
             </IconButton>
           )}
           <IconButton label="Close" className="bg-white/15 text-white backdrop-blur-md" onClick={close}>
@@ -275,7 +323,44 @@ export default function Story() {
         }
         onProfile={(uid) => navigate(`/profile/${uid}`)}
       />
+
+      <Sheet
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        variant="dialog"
+        title="Delete this post?"
+        description="It’s removed from the happ and your profile. This can’t be undone."
+      >
+        <div className="flex gap-3">
+          <Button variant="secondary" className="flex-1" onClick={() => setConfirmDelete(false)}>
+            Cancel
+          </Button>
+          <Button variant="destructive" className="flex-1" loading={deleting} onClick={removePost}>
+            Delete
+          </Button>
+        </div>
+      </Sheet>
     </motion.div>
+  );
+}
+
+/** Story photos are fetched at phone-screen size rather than full upload size. */
+const STORY_WIDTH = 440;
+
+function StoryImage({ url, alt }: { url: string; alt: string }) {
+  const image = useThumb(url, STORY_WIDTH, { quality: 80 });
+  if (!image.src) return null;
+  return (
+    <img
+      src={image.src}
+      alt={alt}
+      className="h-full w-full object-contain"
+      draggable={false}
+      crossOrigin="anonymous"
+      decoding="async"
+      onError={image.onError}
+      onLoad={image.onLoad}
+    />
   );
 }
 

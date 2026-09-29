@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { ProfileRow } from "@/integrations/supabase/types";
+import { forgetCache, readCache, writeCache } from "@/lib/cache";
 
 type AuthContextValue = {
   user: User | null;
@@ -18,14 +19,19 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-async function fetchProfile(userId: string) {
+/** Your profile, or `undefined` if it couldn't be fetched (offline, etc.). */
+async function fetchProfile(userId: string): Promise<ProfileRow | null | undefined> {
   const { data, error } = await supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle();
   if (error) {
     console.error("Error fetching profile:", error);
-    return null;
+    return undefined;
   }
   return data;
 }
+
+// Your profile is kept from last time so the app opens straight onto the map
+// instead of waiting for it on every launch.
+const ownProfileKey = (userId: string) => `own-profile:${userId}`;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -43,10 +49,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Fetch the profile *before* publishing the session, so screens never see
     // "signed in but no username" for a moment and start onboarding by mistake.
     const load = async (next: Session | null) => {
-      const p = next?.user ? await fetchProfile(next.user.id) : null;
+      const uid = next?.user?.id;
+      const saved = uid ? readCache<ProfileRow>(ownProfileKey(uid), { persist: true }) : undefined;
+      if (saved?.username) {
+        setSession(next);
+        setProfile(saved);
+        setIsLoading(false);
+      }
+      const fresh = uid ? await fetchProfile(uid) : null;
       if (cancelled) return;
       setSession(next);
-      setProfile(p);
+      // Couldn't reach the server: keep what we had.
+      setProfile(fresh === undefined ? (saved ?? null) : fresh);
       setIsLoading(false);
     };
 
@@ -69,18 +83,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (user && profile) writeCache(ownProfileKey(user.id), profile, { persist: true });
+  }, [user, profile]);
+
   const refreshProfile = useCallback(async () => {
     if (!user) return null;
     const p = await fetchProfile(user.id);
+    if (p === undefined) return profile; // offline: keep what we have
     setProfile(p);
     return p;
-  }, [user]);
+  }, [user, profile]);
 
   const signOut = useCallback(async () => {
+    if (user) forgetCache(ownProfileKey(user.id));
     await supabase.auth.signOut();
     setSession(null);
     setProfile(null);
-  }, []);
+  }, [user]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
