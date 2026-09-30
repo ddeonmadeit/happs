@@ -322,6 +322,12 @@ async function setUpStripe(ref, current) {
     );
     note("Connect isn't on yet (hosts can't set up payouts until it is)");
   } else if (connectOn) ok("Connect is on");
+  else {
+    note("Can't check Connect in live mode without creating an account");
+    todo.push(
+      "Make sure Stripe Connect is on (dashboard.stripe.com/connect → finish the platform questionnaire, Express accounts). Hosts need it to set up payouts.",
+    );
+  }
 
   // Webhooks: one for payments on our account, one for host accounts.
   const url = `https://${ref}.supabase.co/functions/v1/stripe-webhook`;

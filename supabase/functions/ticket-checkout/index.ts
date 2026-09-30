@@ -108,6 +108,8 @@ Deno.serve(async (req) => {
         currency: happ.currency,
         automatic_payment_methods: { enabled: true },
         description: `Ticket: ${happ.name}`.slice(0, 200),
+        // Shows as "<BUSINESS>* HAPPS" on card statements, so buyers recognise it.
+        statement_descriptor_suffix: "HAPPS",
         receipt_email: user.email ?? undefined,
         transfer_group: `happ_${happ.id}`,
         metadata: { ticket_id: ticket.id, happ_id: happ.id, user_id: user.id },

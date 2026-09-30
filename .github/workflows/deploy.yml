@@ -40,7 +40,7 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5haXdmZWlocXp0b2FydnZhZ2lkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3NjE1ODIsImV4cCI6MjEwNjMzNzU4Mn0.3w5ibC2Q2-o8NS8rh67BsmzL8KgJcfr0kKLqxv1xJRY' }}
           VITE_MAPBOX_TOKEN: ${{ vars.VITE_MAPBOX_TOKEN }}
           # Paid happs. Only switches on with this repo's own backend (see README).
-          VITE_STRIPE_PUBLISHABLE_KEY: ${{ vars.VITE_STRIPE_PUBLISHABLE_KEY }}
+          VITE_STRIPE_PUBLISHABLE_KEY: ${{ vars.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_live_51T2lz26JRSjqUM0WHgqNXWyfRLduSF7Pa0v6bfTv8JVrKhgLUurh8Z5yMj4Jyayvi5OJ0wetsSHw39iRLsjX4VLd00zfCFwzEU' }}
 
       - uses: actions/configure-pages@v5
 
