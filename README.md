@@ -42,11 +42,23 @@ so deep links and email links open correctly.
 
 ### Which backend the live site uses
 
-By default the site talks to **the original The Happs Supabase project**, so
-existing accounts and data keep working. That project has the same tables but
-none of this repo's server-side functions. `src/lib/api.ts` detects this and
-falls back to the queries the original app made. On that backend, push
-notifications stay hidden because it never had a subscriptions table.
+The site uses **The Happs' own Supabase project** (`naiwfeihqztoarvvagid`, in
+Sydney), set up by `npm run provision` from this repo. The URL and the public
+anon key are the defaults in `.github/workflows/deploy.yml`. Repository
+variables with the same names override them:
+
+| Variable                         | Value                               |
+| -------------------------------- | ----------------------------------- |
+| `VITE_SUPABASE_URL`              | `https://<ref>.supabase.co`         |
+| `VITE_SUPABASE_PUBLISHABLE_KEY`  | the project's publishable/anon key  |
+| `VITE_STRIPE_PUBLISHABLE_KEY`    | Stripe publishable key (turns on paid happs) |
+| `VITE_MAPBOX_TOKEN` *(optional)* | a public Mapbox token               |
+
+The app can still run against the **original The Happs backend** (the Lovable
+project): point `VITE_SUPABASE_URL` and the key back at it. That backend has
+the same tables but none of this repo's server-side functions.
+`src/lib/api.ts` detects this and falls back to the queries the original app
+made. Push notifications and paid happs stay hidden there.
 
 Two quirks of that backend are handled in the app:
 
@@ -55,19 +67,6 @@ Two quirks of that backend are handled in the app:
   labels in turn (`photo`, …) and remembers the one the database accepts.
 - It has no `starts_at` column, so a scheduled happ is stored with
   `created_at` (and `last_activity_at`) set to its start time.
-
-To move to your own project with the full backend below, add these under
-**Settings → Secrets and variables → Actions → Variables** and re-run the
-workflow:
-
-| Variable                         | Value                               |
-| -------------------------------- | ----------------------------------- |
-| `VITE_SUPABASE_URL`              | `https://<ref>.supabase.co`         |
-| `VITE_SUPABASE_PUBLISHABLE_KEY`  | your project's publishable/anon key |
-| `VITE_MAPBOX_TOKEN` *(optional)* | a public Mapbox token               |
-
-The app switches to the new functions automatically. Add
-`https://<user>.github.io/<repo>/auth` to the project's Auth redirect URLs.
 
 ## Local development
 

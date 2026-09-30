@@ -276,15 +276,23 @@ async function setSecrets(ref, current) {
   ok(changes.length ? `Set ${changes.map(([n]) => n).join(", ")}` : "Already up to date");
 }
 
-function deployFunctions(ref) {
+async function deployFunctions(ref) {
   step("Edge functions");
   const [cmd, ...args] = SUPABASE_CLI;
-  const res = spawnSync(cmd, [...args, "functions", "deploy", "--project-ref", ref, "--use-api"], {
-    cwd: ROOT,
-    stdio: "inherit",
-    env: { ...process.env, SUPABASE_ACCESS_TOKEN: token },
-  });
-  if (res.status !== 0) fail("Deploying the edge functions failed (see above). Re-run to retry.");
+  // Supabase's bundler sometimes has a bad moment (HTTP 500); try again.
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const res = spawnSync(cmd, [...args, "functions", "deploy", "--project-ref", ref, "--use-api"], {
+      cwd: ROOT,
+      stdio: "inherit",
+      env: { ...process.env, SUPABASE_ACCESS_TOKEN: token },
+    });
+    if (res.status === 0) return;
+    if (attempt < 3) {
+      note(`Deploy failed, trying again (${attempt + 1}/3)…`);
+      await sleep(15_000);
+    }
+  }
+  fail("Deploying the edge functions failed (see above). Re-run to retry.");
 }
 
 async function checkFunctions(ref) {
@@ -491,7 +499,7 @@ await migrate(ref);
 await configureAuth(ref);
 const current = await existingSecrets(ref);
 await setSecrets(ref, current);
-deployFunctions(ref);
+await deployFunctions(ref);
 await checkFunctions(ref);
 let cronSecret = null;
 if (stripeKey) {

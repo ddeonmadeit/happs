@@ -34,10 +34,10 @@ jobs:
         env:
           # Served from https://<user>.github.io/<repo>/
           BASE_PATH: /${{ github.event.repository.name }}/
-          # Backend. Defaults to the original The Happs project; override with
+          # Backend. Defaults to The Happs' own Supabase project; override with
           # repository variables (Settings -> Secrets and variables -> Actions -> Variables).
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://eqvucbryrllabqcvqbdo.supabase.co' }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxdnVjYnJ5cmxsYWJxY3ZxYmRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4NzM0ODgsImV4cCI6MjA4MzQ0OTQ4OH0.XWa9bNWIKfpogrMU9qr-REteAGGWSfTXe7G-wcdZsKQ' }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://naiwfeihqztoarvvagid.supabase.co' }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5haXdmZWlocXp0b2FydnZhZ2lkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA3NjE1ODIsImV4cCI6MjEwNjMzNzU4Mn0.3w5ibC2Q2-o8NS8rh67BsmzL8KgJcfr0kKLqxv1xJRY' }}
           VITE_MAPBOX_TOKEN: ${{ vars.VITE_MAPBOX_TOKEN }}
           # Paid happs. Only switches on with this repo's own backend (see README).
           VITE_STRIPE_PUBLISHABLE_KEY: ${{ vars.VITE_STRIPE_PUBLISHABLE_KEY }}
