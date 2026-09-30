@@ -88,6 +88,32 @@ npm run dev                 # http://localhost:8080
 
 Everything the backend needs lives in `supabase/`.
 
+### One command
+
+`scripts/provision.mjs` does the whole setup, paid happs included:
+
+- Creates (or reuses) a Supabase project called `the-happs` in Sydney, and builds the database.
+- Deploys every edge function with its secrets: Mapbox, web push keys, Stripe.
+- Sets the sign-in redirect URLs.
+- Creates the two Stripe webhooks and the hourly payout job.
+- Registers the Apple Pay domain.
+- Checks that it all responds.
+
+```bash
+SUPABASE_ACCESS_TOKEN=sbp_...        # supabase.com/dashboard/account/tokens
+STRIPE_SECRET_KEY=sk_test_...        # dashboard.stripe.com/test/apikeys
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+npm run provision                    # add -- --switch-live to point the live site at it
+```
+
+It's safe to re-run. Run it again with live Stripe keys when your Stripe
+account is activated. `--switch-live` rewrites the backend defaults in
+`.github/workflows/deploy.yml`; commit and push that to move the live site.
+It prints anything left for you to do in a dashboard, such as switching on
+Stripe Connect.
+
+The manual steps below do the same thing by hand.
+
 1. **Create a project** at [supabase.com](https://supabase.com) and link it:
    ```bash
    npx supabase login
