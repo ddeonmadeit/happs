@@ -7,6 +7,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Avatar } from "@/components/ui/Avatar";
 import { Spinner } from "@/components/ui/Spinner";
 import { Pressable, Stagger, StaggerItem } from "@/components/motion";
+import { SuggestedAccounts } from "@/components/profile/SuggestedAccounts";
 import { cn, distanceMeters, shortStart, toSearchPattern } from "@/lib/utils";
 
 type Result = {
@@ -17,6 +18,7 @@ type Result = {
   avatar: string | null;
   live?: boolean;
   startsAt?: string;
+  brand?: string | null;
 };
 
 type Props = {
@@ -36,6 +38,15 @@ type HappHit = {
   is_active: boolean;
   created_at: string;
   starts_at?: string;
+};
+
+type UserHit = {
+  user_id: string;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  account_type?: string;
+  brand_category?: string | null;
 };
 
 function formatDistance(m: number) {
@@ -69,11 +80,13 @@ export function SearchSheet({ open, onClose, happs, location, now }: Props) {
     const t = setTimeout(async () => {
       const quoted = `"${pattern}"`;
       // Only the modern schema has starts_at (the original stores it in created_at).
-      const happColumns = `id, name, suburb, icon_url, is_active, created_at${(await backendMode()) === "modern" ? ", starts_at" : ""}`;
+      const modern = (await backendMode()) === "modern";
+      const happColumns = `id, name, suburb, icon_url, is_active, created_at${modern ? ", starts_at" : ""}`;
+      const userColumns = `user_id, username, display_name, avatar_url${modern ? ", account_type, brand_category" : ""}`;
       const [users, found] = await Promise.all([
         supabase
           .from("profiles")
-          .select("user_id, username, display_name, avatar_url")
+          .select(userColumns)
           .not("username", "is", null)
           .or(`username.ilike.${quoted},display_name.ilike.${quoted}`)
           .limit(6),
@@ -95,12 +108,13 @@ export function SearchSheet({ open, onClose, happs, location, now }: Props) {
           live: h.is_active,
           startsAt: happStartsAt(h),
         })),
-        ...(users.data ?? []).map<Result>((u) => ({
+        ...((users.data ?? []) as unknown as UserHit[]).map<Result>((u) => ({
           type: "user",
           id: u.user_id,
           title: u.display_name || u.username || "User",
           subtitle: u.username ? `@${u.username}` : null,
           avatar: u.avatar_url,
+          brand: u.account_type === "brand" ? u.brand_category || "Brand" : null,
         })),
       ]);
       setLoading(false);
@@ -185,7 +199,7 @@ export function SearchSheet({ open, onClose, happs, location, now }: Props) {
                   subtitle={r.subtitle}
                   badge={
                     r.type === "user"
-                      ? "Person"
+                      ? r.brand ?? "Person"
                       : r.startsAt && isUpcoming(r.startsAt, now)
                         ? shortStart(r.startsAt)
                         : r.live
@@ -201,6 +215,8 @@ export function SearchSheet({ open, onClose, happs, location, now }: Props) {
         )
       ) : (
         <>
+          <SuggestedAccounts title="Suggested for you" kind="person" onOpen={onClose} className="mb-5" bleed="-mx-6 px-6" />
+          <SuggestedAccounts title="Brands to follow" kind="brand" onOpen={onClose} className="mb-5" bleed="-mx-6 px-6" />
           <h3 className="mb-2 mt-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">Happening now</h3>
           {happeningNow.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-10 text-center text-muted-foreground">

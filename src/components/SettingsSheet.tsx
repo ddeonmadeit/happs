@@ -1,9 +1,10 @@
 import { useNavigate } from "react-router-dom";
-import type { ReactNode } from "react";
-import { Banknote, ChevronRight, LogOut, Smartphone, TicketIcon } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Banknote, ChevronRight, LayoutDashboard, LogOut, Smartphone, TicketIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { useTicketing } from "@/hooks/useTicketing";
+import { isAdmin } from "@/lib/admin";
 import { Sheet } from "@/components/ui/Sheet";
 import { PushToggle } from "@/components/PushControls";
 import { Pressable } from "@/components/motion";
@@ -13,6 +14,10 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
   const { signOut } = useAuth();
   const { isInstalled } = useInstallPrompt();
   const ticketing = useTicketing();
+  const [admin, setAdmin] = useState(false);
+  useEffect(() => {
+    if (open) isAdmin().then(setAdmin);
+  }, [open]);
   const go = (path: string) => {
     onClose();
     navigate(path);
@@ -24,6 +29,10 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
         <div className="rounded-3xl bg-muted/60 p-3">
           <PushToggle />
         </div>
+
+        {admin && (
+          <Row icon={<LayoutDashboard className="h-5 w-5" />} title="Dashboard" text="Users, activity and money" onClick={() => go("/dash")} />
+        )}
 
         {ticketing && (
           <>

@@ -521,5 +521,7 @@ if (SWITCH_LIVE) switchLive(url, anonKey);
 
 console.log(`\nDone.\n  VITE_SUPABASE_URL=${url}\n  VITE_SUPABASE_PUBLISHABLE_KEY=${anonKey}`);
 if (stripePublishable) console.log(`  VITE_STRIPE_PUBLISHABLE_KEY=${stripePublishable}`);
-if (!SWITCH_LIVE) console.log("\nThe live site still uses the original backend. Re-run with --switch-live to move it.");
+if (!SWITCH_LIVE && !readFileSync(join(ROOT, ".github/workflows/deploy.yml"), "utf8").includes(ref)) {
+  console.log("\nThe live site uses a different backend. Re-run with --switch-live to move it here.");
+}
 if (todo.length) console.log(`\nStill to do:\n${todo.map((t) => `  - ${t}`).join("\n")}`);

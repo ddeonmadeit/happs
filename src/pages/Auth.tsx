@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { Camera, ChevronLeft, Eye, EyeOff, ImageIcon, MailCheck, X } from "lucide-react";
+import { Camera, ChevronLeft, Eye, EyeOff, ImageIcon, MailCheck, Store, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button, IconButton } from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Input";
 import { Avatar } from "@/components/ui/Avatar";
+import { Switch } from "@/components/ui/Switch";
+import { InterestPicker } from "@/components/profile/InterestPicker";
 import { FullScreenLoader } from "@/components/ui/Spinner";
 import { Wordmark } from "@/components/Logo";
 import { Screen, spring } from "@/components/motion";
@@ -15,10 +17,10 @@ import { normalizeUsername, validateUsername } from "@/lib/constants";
 import { resizeImage, uploadMedia } from "@/lib/media";
 import { appUrl, cn, errorMessage } from "@/lib/utils";
 
-type Step = "auth" | "forgot" | "check-email" | "reset" | "username" | "photo";
+type Step = "auth" | "forgot" | "check-email" | "reset" | "username" | "interests" | "photo";
 type Mode = "login" | "signup";
 
-const ONBOARDING: Step[] = ["auth", "username", "photo"];
+const ONBOARDING: Step[] = ["auth", "username", "interests", "photo"];
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -36,6 +38,8 @@ export default function Auth() {
   const [displayName, setDisplayName] = useState("");
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [photo, setPhoto] = useState<{ file: Blob; preview: string } | null>(null);
+  const [interests, setInterests] = useState<string[]>([]);
+  const [isBrand, setIsBrand] = useState(false);
   const [busy, setBusy] = useState(false);
   const galleryRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -152,10 +156,29 @@ export default function Auth() {
         else throw error;
         return;
       }
-      setStep("photo");
-      await refreshProfile();
+      const saved = await refreshProfile();
+      // The original backend has no interests; skip straight to the photo there.
+      setStep(saved && saved.interests === undefined ? "photo" : "interests");
     } catch (err) {
       toast.error(errorMessage(err, "Couldn't save your username"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveInterests = async () => {
+    if (!user) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ interests, account_type: isBrand ? "brand" : "person" })
+        .eq("user_id", user.id);
+      if (error) throw error;
+      await refreshProfile();
+      setStep("photo");
+    } catch (err) {
+      toast.error(errorMessage(err, "Couldn't save your interests"));
     } finally {
       setBusy(false);
     }
@@ -192,7 +215,8 @@ export default function Auth() {
   };
 
   const back = () => {
-    if (step === "photo") setStep("username");
+    if (step === "photo") setStep("interests");
+    else if (step === "interests") setStep("username");
     else if (step === "forgot" || step === "check-email") setStep("auth");
     else navigate("/", { replace: true });
   };
@@ -207,7 +231,7 @@ export default function Auth() {
           <ChevronLeft className="h-6 w-6" strokeWidth={2.5} />
         </IconButton>
         {progress > 0 && (
-          <div className="flex items-center gap-1.5" aria-label={`Step ${progress + 1} of 3`}>
+          <div className="flex items-center gap-1.5" aria-label={`Step ${progress + 1} of ${ONBOARDING.length}`}>
             {ONBOARDING.map((s, i) => (
               <motion.span
                 key={s}
@@ -405,6 +429,31 @@ export default function Auth() {
                   Continue
                 </Button>
               </form>
+            )}
+
+            {step === "interests" && (
+              <div className="space-y-6">
+                <Heading title="What are you into?" subtitle="Pick a few, and we'll show you the right people and happs" />
+                <InterestPicker value={interests} onChange={setInterests} className="justify-center" />
+                <label className="flex items-center gap-3 rounded-3xl bg-muted/60 p-3.5">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
+                    <Store className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-bold">Brand account</span>
+                    <span className="block text-xs text-muted-foreground">For venues, promoters, artists and brands</span>
+                  </span>
+                  <Switch checked={isBrand} onCheckedChange={setIsBrand} label="Brand account" />
+                </label>
+                <div className="space-y-2">
+                  <Button size="lg" className="w-full" loading={busy} onClick={saveInterests} disabled={!interests.length && !isBrand}>
+                    Continue
+                  </Button>
+                  <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => setStep("photo")} disabled={busy}>
+                    Skip for now
+                  </Button>
+                </div>
+              </div>
             )}
 
             {step === "photo" && (

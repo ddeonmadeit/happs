@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { motion } from "motion/react";
-import { Camera, Grid3X3, MapPin, MessageCircle, Play, Settings, TicketIcon, UserRound } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { Camera, ChevronDown, Grid3X3, MapPin, MessageCircle, Play, Plus, Settings, Store, TicketIcon, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { HappRow, ProfileRow } from "@/integrations/supabase/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { TopBar } from "@/components/TopBar";
 import { SettingsSheet } from "@/components/SettingsSheet";
+import { InterestChips, InterestPicker } from "@/components/profile/InterestPicker";
+import { SuggestedAccounts } from "@/components/profile/SuggestedAccounts";
 import { useTicketing } from "@/hooks/useTicketing";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button, IconButton } from "@/components/ui/Button";
@@ -21,6 +23,7 @@ import { useThumb } from "@/hooks/useThumb";
 import { posterUrl } from "@/lib/media";
 import { normalizeUsername, validateUsername } from "@/lib/constants";
 import { resizeImage, uploadMedia } from "@/lib/media";
+import { BRAND_CATEGORIES } from "@/lib/interests";
 import { cn, errorMessage, shortTimeAgo } from "@/lib/utils";
 
 type GridPost = { id: string; media_url: string; media_type: string; happ_id: string };
@@ -57,6 +60,8 @@ export default function Profile() {
   const [followBusy, setFollowBusy] = useState(false);
   const [messageBusy, setMessageBusy] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
+  // "Suggested for you" under someone's profile, like Instagram after you follow.
+  const [showSimilar, setShowSimilar] = useState(false);
   const avatarInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -64,6 +69,7 @@ export default function Profile() {
     let cancelled = false;
     setTab("posts");
     setHapps(null);
+    setShowSimilar(false);
     (async () => {
       const [profileRes, postsRes, followersRes, followingRes, followRes] = await Promise.all([
         supabase.from("profiles").select("*").eq("user_id", targetId).maybeSingle(),
@@ -108,6 +114,7 @@ export default function Profile() {
     setFollowBusy(true);
     const next = !isFollowing;
     setIsFollowing(next);
+    if (next) setShowSimilar(true);
     setStats((s) => ({ ...s, followers: Math.max(0, s.followers + (next ? 1 : -1)) }));
     const { error } = next
       ? await supabase.from("follows").insert({ follower_id: user.id, following_id: targetId })
@@ -232,11 +239,29 @@ export default function Profile() {
           </div>
 
           <div>
-            <h2 className="text-xl font-extrabold tracking-tight">{name}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="min-w-0 truncate text-xl font-extrabold tracking-tight">{name}</h2>
+              {profile.account_type === "brand" && (
+                <span className="flex shrink-0 items-center gap-1 rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-bold text-accent">
+                  <Store className="h-3 w-3" strokeWidth={2.6} />
+                  {profile.brand_category || "Brand"}
+                </span>
+              )}
+            </div>
             {profile.bio ? (
               <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed text-foreground/85">{profile.bio}</p>
             ) : (
               isOwn && <p className="mt-1 text-sm text-muted-foreground">Add a bio so people know who you are.</p>
+            )}
+            <InterestChips ids={profile.interests ?? []} className="mt-3" />
+            {isOwn && profile.interests !== undefined && profile.interests.length === 0 && (
+              <button
+                type="button"
+                onClick={() => setEditOpen(true)}
+                className="mt-3 flex items-center gap-1 rounded-full border border-dashed border-accent/50 px-3 py-1 text-xs font-bold text-accent"
+              >
+                <Plus className="h-3.5 w-3.5" strokeWidth={2.6} /> Add your interests
+              </button>
             )}
           </div>
 
@@ -252,7 +277,35 @@ export default function Profile() {
               <Button variant="secondary" className="flex-1" onClick={startMessage} loading={messageBusy}>
                 <MessageCircle className="h-4 w-4" /> Message
               </Button>
+              <IconButton
+                label={showSimilar ? "Hide suggestions" : "Similar accounts"}
+                variant="muted"
+                className="h-11 w-11 rounded-2xl"
+                onClick={() => setShowSimilar((v) => !v)}
+              >
+                <motion.span animate={{ rotate: showSimilar ? 180 : 0 }} transition={spring.snappy}>
+                  <ChevronDown className="h-5 w-5" />
+                </motion.span>
+              </IconButton>
             </div>
+          )}
+
+          {isOwn ? (
+            <SuggestedAccounts title="Discover people" />
+          ) : (
+            <AnimatePresence initial={false}>
+              {showSimilar && targetId && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={spring.snappy}
+                  className="overflow-hidden"
+                >
+                  <SuggestedAccounts title="Suggested for you" like={targetId} />
+                </motion.div>
+              )}
+            </AnimatePresence>
           )}
         </section>
 
@@ -399,12 +452,20 @@ function EditProfileSheet({
   onSaved: (p: ProfileRow) => void;
 }) {
   const [form, setForm] = useState({ display_name: "", username: "", bio: "" });
+  const [interests, setInterests] = useState<string[]>([]);
+  const [accountType, setAccountType] = useState<"person" | "brand">("person");
+  const [category, setCategory] = useState<string | null>(null);
+  // The original backend has none of these columns.
+  const extended = profile.interests !== undefined;
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
       setForm({ display_name: profile.display_name ?? "", username: profile.username ?? "", bio: profile.bio ?? "" });
+      setInterests(profile.interests ?? []);
+      setAccountType(profile.account_type ?? "person");
+      setCategory(profile.brand_category ?? null);
       setUsernameError(null);
     }
   }, [open, profile]);
@@ -426,6 +487,9 @@ function EditProfileSheet({
         username,
         display_name: form.display_name.trim() || null,
         bio: form.bio.trim() || null,
+        ...(extended
+          ? { interests, account_type: accountType, brand_category: accountType === "brand" ? category : null }
+          : {}),
       })
       .eq("user_id", profile.user_id)
       .select("*")
@@ -482,6 +546,64 @@ function EditProfileSheet({
             className="min-h-[5.5rem]"
           />
         </Field>
+        {extended && (
+          <>
+            <Field label="Account type">
+              <div className="grid grid-cols-2 rounded-2xl bg-muted p-1" role="radiogroup" aria-label="Account type">
+                {(["person", "brand"] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    role="radio"
+                    aria-checked={accountType === option}
+                    onClick={() => setAccountType(option)}
+                    className="relative h-11 rounded-xl text-[15px] font-bold"
+                  >
+                    {accountType === option && (
+                      <motion.span layoutId="account-type-pill" transition={spring.bouncy} className="glitch-bg absolute inset-0 rounded-xl" />
+                    )}
+                    <span className={cn("relative transition-colors", accountType === option ? "text-accent-foreground" : "text-muted-foreground")}>
+                      {option === "person" ? "Personal" : "Brand"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </Field>
+            <AnimatePresence initial={false}>
+              {accountType === "brand" && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={spring.snappy}
+                  className="overflow-hidden"
+                >
+                  <Field label="What kind of brand?">
+                    <div className="flex flex-wrap gap-2">
+                      {BRAND_CATEGORIES.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          aria-pressed={category === c}
+                          onClick={() => setCategory(category === c ? null : c)}
+                          className={cn(
+                            "h-9 rounded-full px-3.5 text-sm font-bold transition-colors",
+                            category === c ? "glitch-bg text-accent-foreground" : "bg-muted text-foreground/80",
+                          )}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <Field label="Interests" counter={`${interests.length}/10`} hint="Shown on your profile, and used to suggest people to follow">
+              <InterestPicker value={interests} onChange={setInterests} />
+            </Field>
+          </>
+        )}
         <Button type="submit" size="lg" className="w-full" loading={saving}>
           Save
         </Button>

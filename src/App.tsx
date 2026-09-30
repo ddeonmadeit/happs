@@ -34,6 +34,7 @@ const Chat = lazyPage(screens.chat);
 const Tickets = lazyPage(screens.tickets);
 const Payouts = lazyPage(() => import("@/pages/Payouts"));
 const CheckIn = lazyPage(() => import("@/pages/CheckIn"));
+const Dash = lazyPage(() => import("@/pages/Dash"));
 const Install = lazyPage(() => import("@/pages/Install"));
 const NotFound = lazyPage(() => import("@/pages/NotFound"));
 
@@ -92,6 +93,7 @@ function Shell() {
           <Route path="/messages/:conversationId" element={protect(<Lazy el={<Chat />} />)} />
           <Route path="/tickets" element={protect(<Lazy el={<Tickets />} />)} />
           <Route path="/payouts" element={protect(<Lazy el={<Payouts />} />)} />
+          <Route path="/dash" element={protect(<Lazy el={<Dash />} />)} />
           <Route path="/install" element={<Lazy el={<Install />} />} />
           <Route path="*" element={<Lazy el={<NotFound />} />} />
         </Routes>

@@ -27,6 +27,83 @@ export type ProfileRow = {
   avatar_url: string | null;
   created_at: string;
   updated_at: string;
+  /** Not on the original backend. */
+  interests?: string[];
+  account_type?: AccountType;
+  brand_category?: string | null;
+};
+
+export type AccountType = "person" | "brand";
+
+export type SuggestedProfileRow = {
+  user_id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  account_type: AccountType;
+  brand_category: string | null;
+  interests: string[];
+  shared_interests: string[];
+  mutual_count: number;
+  mutual_username: string | null;
+  follows_you: boolean;
+  followers: number;
+  reason: string;
+};
+
+export type AdminUserRow = {
+  user_id: string;
+  email: string | null;
+  username: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  account_type: AccountType;
+  brand_category: string | null;
+  interests: string[];
+  created_at: string;
+  last_sign_in_at: string | null;
+  posts: number;
+  happs: number;
+  followers: number;
+  following: number;
+  tickets: number;
+  is_admin: boolean;
+  total: number;
+};
+
+export type AdminHappRow = {
+  id: string;
+  name: string;
+  suburb: string | null;
+  icon_url: string | null;
+  creator_id: string;
+  creator_username: string | null;
+  created_at: string;
+  starts_at: string;
+  last_activity_at: string;
+  is_active: boolean;
+  cancelled_at: string | null;
+  participant_count: number;
+  posts: number;
+  price_cents: number;
+  tickets_sold: number;
+  gross_cents: number;
+};
+
+export type AdminSaleRow = {
+  id: string;
+  happ_id: string;
+  happ_name: string;
+  buyer_id: string;
+  buyer_username: string | null;
+  status: TicketStatus;
+  amount_cents: number;
+  platform_fee_cents: number;
+  currency: string;
+  paid_at: string | null;
+  refunded_at: string | null;
+  transferred_at: string | null;
+  checked_in_at: string | null;
 };
 
 export type HappRow = {
@@ -257,6 +334,19 @@ export type Database = {
       };
       tickets_taken: { Args: { p_happ_id: string }; Returns: number };
       check_in_ticket: { Args: { p_code: string }; Returns: Json };
+      suggest_profiles: {
+        Args: { p_limit?: number; p_kind?: AccountType | null; p_like?: string | null };
+        Returns: SuggestedProfileRow[];
+      };
+      is_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
+      claim_admin: { Args: { p_code: string }; Returns: boolean };
+      admin_overview: { Args: Record<PropertyKey, never>; Returns: Json };
+      admin_users: {
+        Args: { p_search?: string | null; p_limit?: number; p_offset?: number };
+        Returns: AdminUserRow[];
+      };
+      admin_happs: { Args: { p_limit?: number }; Returns: AdminHappRow[] };
+      admin_sales: { Args: { p_limit?: number }; Returns: AdminSaleRow[] };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

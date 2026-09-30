@@ -162,6 +162,7 @@ The manual steps below do the same thing by hand.
 | `notification_log`   | Makes sure each message/happ is only notified once (service role only) |
 | `tickets`            | Tickets for paid happs: status, door code, Stripe payment and payout ids |
 | `stripe_accounts`    | Each host's Stripe payout account and whether it can be paid         |
+| `app_admins`         | Who can open the owner dashboard (`/dash`)                           |
 
 Rules the database enforces (instead of trusting the browser):
 
@@ -211,6 +212,42 @@ if you're retiring that project.
 
 The map is limited to Greater Sydney, as in the original. Change `MAP_BOUNDS`
 and `MAP_CENTER` in `src/lib/constants.ts` to open it up.
+
+### Interests, brands and suggestions
+
+- **Interests:** people pick what they're into (up to 10 from a fixed list:
+  live music, nightlife, food…) when they sign up, and can change them in
+  **Edit profile**. They show as chips on the profile. The list lives in
+  `src/lib/interests.ts` and in the `profiles_interests_valid` check; change
+  both together.
+- **Brand accounts:** a profile can be *Personal* or *Brand* (venues,
+  promoters, artists, labels) with a category such as "Venue", shown as a badge.
+- **Suggested for you:** `suggest_profiles()` ranks accounts you don't follow
+  yet. It weighs shared interests, people you follow who follow them, whether
+  they follow you, and popularity. Suggestions appear in search (people and
+  brands in separate rows), as "Discover people" on your own profile, and
+  under someone's profile after you follow them. The X on a card hides it on
+  that device.
+
+### Owner dashboard (/dash)
+
+`/dash` shows every user (with email, join date, last sign-in and activity),
+headline numbers, sign-ups, happs and posts per day, what people are into,
+recent happs, ticket sales, and the money: gross sales, your 13%, what's owed
+to hosts and what's been paid out. Admins also get a **Dashboard** row in
+Settings.
+
+Only accounts in `app_admins` can see it; the database checks every request.
+To make an account an admin, give it a one-time code. Run this in the Supabase
+SQL editor with a code of your choice:
+
+```sql
+insert into public.app_admin_claims (code_hash)
+values (encode(sha256(convert_to('YOUR-CODE', 'UTF8')), 'hex'));
+```
+
+Then open `/dash?code=YOUR-CODE` signed in as that account, or type the
+code on `/dash`. Each code works once.
 
 ### Paid happs (tickets)
 
