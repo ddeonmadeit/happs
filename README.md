@@ -166,6 +166,10 @@ The manual steps below do the same thing by hand.
 
 Rules the database enforces (instead of trusting the browser):
 
+- People sign in with their email or their username. `login_email()` swaps a
+  username for its email only when the password is right, so emails never
+  leak, and it locks username sign-in for 15 minutes after 10 wrong passwords.
+
 - A happ shows on the map for 24 h after it's created, as long as there's been
   activity in the last 2 h (`get_map_happs`).
 - A happ can be scheduled up to 60 days ahead (`starts_at`). Until then it

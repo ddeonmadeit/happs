@@ -22,6 +22,24 @@ type Mode = "login" | "signup";
 
 const ONBOARDING: Step[] = ["auth", "username", "interests", "photo"];
 
+/**
+ * Sign-in takes an email or a username. For a username, the database checks
+ * the password and only then hands back the account's email (so emails stay
+ * private), and Supabase Auth signs in with that as usual.
+ */
+async function loginEmail(identifier: string, password: string) {
+  const id = identifier.trim();
+  if (id.includes("@")) return id;
+  const { data, error } = await supabase.rpc("login_email", { p_username: id, p_password: password });
+  if (error) {
+    // The original backend has no username sign-in.
+    if (error.code === "PGRST202") throw new Error("Sign in with your email address");
+    throw new Error(error.message);
+  }
+  if (!data) throw new Error("Invalid login credentials");
+  return data;
+}
+
 export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -85,13 +103,14 @@ export default function Auth() {
         if (error) throw error;
         if (!data.session) setStep("check-email");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        const { error } = await supabase.auth.signInWithPassword({ email: await loginEmail(email, password), password });
         if (error) throw error;
       }
     } catch (err) {
       const message = errorMessage(err, "Authentication failed");
+      const byUsername = mode === "login" && !email.includes("@");
       if (message.includes("already registered")) toast.error("That email is already registered. Try signing in.");
-      else if (message.includes("Invalid login")) toast.error("Incorrect email or password");
+      else if (message.includes("Invalid login")) toast.error(`Incorrect ${byUsername ? "username" : "email"} or password`);
       else toast.error(message);
     } finally {
       setBusy(false);
@@ -264,16 +283,19 @@ export default function Auth() {
                   title={mode === "login" ? "Welcome back" : "Create your account"}
                   subtitle={mode === "login" ? "Sign in to see what’s happening" : "It only takes a minute"}
                 />
-                <Field label="Email" htmlFor="email">
+                <Field label={mode === "login" ? "Email or username" : "Email"} htmlFor="email">
                   <Input
                     id="email"
-                    type="email"
-                    autoComplete="email"
+                    type={mode === "login" ? "text" : "email"}
+                    autoComplete={mode === "login" ? "username" : "email"}
                     inputMode="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
+                    placeholder={mode === "login" ? "you@example.com or yourname" : "you@example.com"}
                   />
                 </Field>
                 <Field label="Password" htmlFor="password">

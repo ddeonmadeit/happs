@@ -339,6 +339,7 @@ export type Database = {
         Returns: SuggestedProfileRow[];
       };
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean };
+      login_email: { Args: { p_username: string; p_password: string }; Returns: string | null };
       claim_admin: { Args: { p_code: string }; Returns: boolean };
       admin_overview: { Args: Record<PropertyKey, never>; Returns: Json };
       admin_users: {
